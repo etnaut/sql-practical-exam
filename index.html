@@ -1,0 +1,232 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>SQL Practical Exam · PostgreSQL</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.2.1/dist/sql-wasm.js"></script>
+  <!-- Firebase SDK -->
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+  <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <link rel="stylesheet" href="style.css">
+</head>
+
+<body>
+  <div class="wrap">
+
+    <header>
+      <div class="brand">
+        <div class="dot"></div>
+        <div>
+          <h1>practical_exam=# </h1>
+          <small>PostgreSQL Practical Exam · SELECT / INSERT / UPDATE / DELETE / JOIN / GROUP BY / HAVING /
+            aggregates</small>
+        </div>
+      </div>
+      <div class="hud">
+        <button id="backBtn">← back to setup</button>
+        <div class="chip">Student <b id="studentLabel">—</b></div>
+        <div class="chip" id="modeChip">Mode <b id="modeLabel">—</b></div>
+        <div class="chip">Bank Used <b id="progressLabel">0 / 21</b></div>
+        <div class="chip score">Last Score <b id="scoreLabel">—</b></div>
+        <button id="tryAgainBtn">↩ try again</button>
+        <button id="restartBtn">↺ new student</button>
+        <button id="resetBankBtn">↻ reset question bank</button>
+      </div>
+    </header>
+    <div class="progressbar">
+      <div id="progressFill"></div>
+    </div>
+
+    <div style="height:20px"></div>
+
+    <div class="refs">
+      <div class="term">
+        <div class="term-bar">
+          <div class="tl"><span></span><span></span><span></span></div>
+          <div class="title">departments</div>
+          <div class="flag">reference</div>
+        </div>
+        <div class="table-scroll" id="deptTable"></div>
+      </div>
+      <div class="term">
+        <div class="term-bar">
+          <div class="tl"><span></span><span></span><span></span></div>
+          <div class="title">employees</div>
+          <div class="flag">reference</div>
+        </div>
+        <div class="table-scroll" id="empTable"></div>
+      </div>
+    </div>
+
+    <div id="modeBanner" class="mode-banner exam" style="display:none;">
+      <span id="modeBannerText"></span>
+    </div>
+
+    <div class="term">
+      <div class="term-bar">
+        <div class="tl"><span></span><span></span><span></span></div>
+        <div class="title" id="qCategoryTitle">question</div>
+      </div>
+      <div class="qpanel">
+        <div class="qtop" id="qTagsRow"></div>
+        <div class="qtext"><span class="prompt-marker">&gt;</span><span id="qText">Loading question bank…</span></div>
+        <div class="hint-line" id="hintLine"></div>
+        <div class="qactions">
+          <button class="btn-ghost" id="hintBtn">💡 show hint</button>
+          <span class="timer-chip" id="timerChip">⏱ 2:00</span>
+        </div>
+      </div>
+    </div>
+
+    <div style="height:16px"></div>
+
+    <div class="term editor-shell">
+      <div class="term-bar">
+        <div class="tl"><span></span><span></span><span></span></div>
+        <div class="title">query editor</div>
+      </div>
+      <div class="editor-inner">
+        <div class="prompt-tag">postgres=#</div>
+        <div class="editor-input-wrap" id="editorInputWrap">
+          <textarea id="queryInput" spellcheck="false" autocomplete="off"
+            placeholder="Type your SQL statement here…"></textarea>
+          <div class="sql-highlight" id="sqlHighlight" aria-hidden="true"></div>
+        </div>
+      </div>
+      <div class="editor-foot">
+        <span class="hotkey">ctrl / ⌘ + enter to submit</span>
+        <div class="btn-row">
+          <button class="secondary" id="clearBtn">clear</button>
+          <button class="secondary" id="skipBtn">⏭ Skip Question</button>
+          <button class="primary" id="submitBtn">Submit Answer</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="results-wrap">
+      <div class="term">
+        <div class="term-bar">
+          <div class="tl"><span></span><span></span><span></span></div>
+          <div class="title">query result — live</div>
+          <div class="flag" style="display:flex;align-items:center;gap:6px;"><span class="status-dot"
+              id="statusDot"></span><span id="statusText">idle</span></div>
+        </div>
+        <div id="resultArea">
+          <div class="empty-msg">Start typing a query to see live results…</div>
+        </div>
+        <div class="row-count" id="rowCount" style="display:none;"></div>
+        <div class="score-meter">
+          <div class="val tier-none" id="scoreMeterVal">—</div>
+          <div class="maxlabel" id="scoreMeterMax">points if submitted right now (out of 50)</div>
+          <div class="meter-track">
+            <div id="scoreMeterFill"></div>
+          </div>
+          <div class="caption" id="scoreMeterCaption"></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="feedback" id="feedbackBox">
+      <div class="fmain" id="feedbackMain"></div>
+      <div class="fsub" id="feedbackSub"></div>
+      <div class="feedback-actions" id="feedbackActions"></div>
+    </div>
+
+    <div style="height:16px"></div>
+
+    <div class="term">
+      <div class="term-bar">
+        <div class="tl"><span></span><span></span><span></span></div>
+        <div class="title">leaderboard — students who completed the exam</div>
+        <div class="flag" id="leaderboardCount">0 entries</div>
+      </div>
+      <div class="table-scroll" id="leaderboardArea" style="max-height:280px;">
+        <div class="empty-msg">No one has finished the exam yet — scores will appear here as students complete it.</div>
+      </div>
+      <div class="row-count" style="display:flex; justify-content:flex-end;">
+        <button class="btn-ghost" id="clearLeaderboardBtn" style="padding:3px 9px; font-size:10.5px;">clear
+          leaderboard</button>
+      </div>
+    </div>
+
+    <footer>SQL.js (SQLite/WASM) in-browser engine · PostgreSQL-style SQL for this exam scope</footer>
+  </div>
+
+  <div class="modal-overlay show" id="nameModalOverlay">
+    <div class="modal" style="max-width:520px;">
+      <h2>practical_exam=#</h2>
+      <div class="grade" style="margin-bottom:14px;">Choose exam mode &amp; enter your name</div>
+
+      <!-- Mode selection -->
+      <div class="mode-select">
+        <div class="mode-card practice selected" id="modeCardPractice" onclick="selectMode('practice')">
+          <span class="mc-badge">PRACTICE</span>
+          <span class="mc-icon">🧪</span>
+          <span class="mc-title">Practice Mode</span>
+          <span class="mc-desc">Unlimited attempts per question. Hints always free. No time penalty. Great for learning
+            and review.</span>
+        </div>
+        <div class="mode-card exam" id="modeCardExam" onclick="selectMode('exam')">
+          <span class="mc-badge">EXAM</span>
+          <span class="mc-icon">🏆</span>
+          <span class="mc-title">Exam Mode</span>
+          <span class="mc-desc">One attempt per student. Timer starts on first keystroke. Hint use reduces max score to
+            30/50.</span>
+        </div>
+      </div>
+
+      <div style="font-family:var(--mono); font-size:11.5px; color:var(--text-faint); margin-bottom:12px;"
+        id="modalSubtext">Loading SQL engine…</div>
+
+      <!-- Difficulty selection: Practice Mode only -->
+      <div id="difficultyWrap" style="margin-bottom:14px;">
+        <div class="diff-label">Practice Difficulty</div>
+        <div class="diff-select">
+          <div class="diff-pill selected" id="diffPillAll" onclick="selectDifficulty('all')">All</div>
+          <div class="diff-pill" id="diffPillEasy" onclick="selectDifficulty('easy')">🟢 Easy</div>
+          <div class="diff-pill" id="diffPillMedium" onclick="selectDifficulty('medium')">🟡 Medium</div>
+          <div class="diff-pill" id="diffPillHard" onclick="selectDifficulty('hard')">🔴 Hard</div>
+        </div>
+      </div>
+
+      <div id="nameFieldWrap">
+        <input type="text" id="studentNameInput" placeholder="Full name" autocomplete="off" value=""
+          style="width:100%; font-family:var(--mono); font-size:14px; color:var(--text); background:var(--panel-alt); border:1px solid var(--border); border-radius:7px; padding:11px 12px; outline:none; box-sizing:border-box;"
+          disabled>
+        <div id="nameError"
+          style="display:none; color:var(--red); font-family:var(--mono); font-size:11.5px; margin-top:8px; text-align:left;">
+          Please enter your name before starting.</div>
+      </div>
+      <div class="setup-actions" style="display:flex; gap:10px; margin-top:16px;">
+        <button class="primary" id="startExamBtn" style="margin-top:0; width:100%;" disabled>Loading…</button>
+      </div>
+    </div>
+  </div>
+
+
+
+  <!-- Next-student modal: shown in exam mode when the current student finishes -->
+  <div class="modal-overlay" id="nextStudentModalOverlay">
+    <div class="modal" style="max-width:440px;">
+      <h2>practical_exam=#</h2>
+      <div class="grade" style="margin-bottom:6px;">🏆 Exam Mode — Next Student</div>
+      <p style="font-family:var(--mono); font-size:11.5px; color:var(--text-dim); margin:0 0 18px;">Enter the next
+        student's full name to start their exam question.</p>
+      <input type="text" id="nextStudentNameInput" placeholder="Full name" autocomplete="off" value=""
+        style="width:100%; font-family:var(--mono); font-size:14px; color:var(--text); background:var(--panel-alt); border:1px solid var(--border); border-radius:7px; padding:11px 12px; outline:none; box-sizing:border-box;">
+      <div id="nextStudentNameError"
+        style="display:none; color:var(--red); font-family:var(--mono); font-size:11.5px; margin-top:8px; text-align:left;">
+        Please enter the student's name before starting.</div>
+      <div style="display:flex; gap:10px; margin-top:16px;">
+        <button class="secondary" id="nextStudentBackBtn" type="button" style="flex:1;">← Change Mode</button>
+        <button class="primary" id="nextStudentStartBtn" style="margin-top:0; flex:1;">Start Exam →</button>
+      </div>
+    </div>
+  </div>
+
+  <script src="script.js"></script>
+</body>
+
+</html>
