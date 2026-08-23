@@ -200,12 +200,11 @@
           Please enter your name before starting.</div>
       </div>
       <div class="setup-actions" style="display:flex; gap:10px; margin-top:16px;">
-        <button class="primary" id="startExamBtn" style="margin-top:0; width:100%;" disabled>Loading…</button>
+        <button class="secondary" id="modalLeaderboardBtn" type="button" style="flex:1;">🏆 Leaderboard</button>
+        <button class="primary" id="startExamBtn" style="margin-top:0; flex:1;" disabled>Loading…</button>
       </div>
     </div>
   </div>
-
-
 
   <!-- Next-student modal: shown in exam mode when the current student finishes -->
   <div class="modal-overlay" id="nextStudentModalOverlay">
@@ -219,9 +218,31 @@
       <div id="nextStudentNameError"
         style="display:none; color:var(--red); font-family:var(--mono); font-size:11.5px; margin-top:8px; text-align:left;">
         Please enter the student's name before starting.</div>
-      <div style="display:flex; gap:10px; margin-top:16px;">
+      <div style="display:flex; gap:10px; margin-top:16px; flex-wrap:wrap;">
         <button class="secondary" id="nextStudentBackBtn" type="button" style="flex:1;">← Change Mode</button>
-        <button class="primary" id="nextStudentStartBtn" style="margin-top:0; flex:1;">Start Exam →</button>
+        <button class="secondary" id="nextStudentLeaderboardBtn" type="button" style="flex:1;">🏆 Leaderboard</button>
+        <button class="primary" id="nextStudentStartBtn" style="margin-top:0; flex:100%;">Start Exam →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Dedicated Leaderboard modal overlay -->
+  <div class="modal-overlay" id="leaderboardModalOverlay">
+    <div class="modal" style="max-width:580px; text-align:left;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <h2 style="margin:0; font-size:15px; color:var(--text);">🏆 Leaderboard</h2>
+        <button class="btn-ghost" id="closeLeaderboardModalBtn" type="button" style="padding:4px 10px;">✕ Close</button>
+      </div>
+      <div style="font-family:var(--mono); font-size:11.5px; color:var(--text-dim); margin-bottom:12px; display:flex; justify-content:space-between; align-items:center;">
+        <span>Students who completed the exam</span>
+        <span id="modalLeaderboardCount" class="flag">0 entries</span>
+      </div>
+      <div class="table-scroll" id="modalLeaderboardArea" style="max-height:280px; background:var(--panel-alt); border:1px solid var(--border); border-radius:6px;">
+        <div class="empty-msg">No one has finished the exam yet — scores will appear here as students complete it.</div>
+      </div>
+      <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; flex-wrap:wrap; gap:10px;">
+        <button class="btn-ghost" id="modalClearLeaderboardBtn" type="button" style="color:var(--red); border-color:#5c2424;">clear leaderboard</button>
+        <button class="secondary" id="modalLeaderboardCloseBtn" type="button">Back</button>
       </div>
     </div>
   </div>

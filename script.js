@@ -39,128 +39,188 @@ INSERT INTO employees (emp_id, emp_name, dept_id, salary, hire_date, age) VALUES
 `;
 
 const QUESTIONS = [
-  { id:1, difficulty:'easy', tags:['SELECT'], type:'select', orderMatters:false,
-    text:"Select all columns and all rows from the employees table.",
-    hint:"Use SELECT * with a FROM clause — no WHERE needed.",
-    sql:"SELECT * FROM employees;" },
-  { id:2, difficulty:'easy', tags:['SELECT'], type:'select', orderMatters:false,
-    text:"Show all employees whose salary is greater than 30000.",
-    hint:"Add a WHERE clause using the greater-than operator on salary.",
-    sql:"SELECT * FROM employees WHERE salary > 30000;" },
-  { id:3, difficulty:'medium', tags:['SELECT'], type:'select', orderMatters:true,
-    text:"Display emp_name and salary of every employee, ordered by salary from highest to lowest.",
-    hint:"Use ORDER BY salary DESC.",
-    sql:"SELECT emp_name, salary FROM employees ORDER BY salary DESC;" },
-  { id:4, difficulty:'easy', tags:['SELECT'], type:'select', orderMatters:false,
-    text:"Find all employees whose name starts with the letter 'A'.",
-    hint:"Use WHERE emp_name LIKE 'A%'.",
-    sql:"SELECT * FROM employees WHERE emp_name LIKE 'A%';" },
-  { id:5, difficulty:'easy', tags:['INSERT'], type:'dml', table:'employees', pk:'emp_id',
-    text:"Insert a new employee: emp_id 16, emp_name 'Grace Lim', dept_id 2, salary 28000, hire_date '2024-01-15', age 26.",
-    hint:"INSERT INTO employees (columns...) VALUES (values...);",
-    sql:"INSERT INTO employees (emp_id, emp_name, dept_id, salary, hire_date, age) VALUES (16, 'Grace Lim', 2, 28000, '2024-01-15', 26);" },
-  { id:6, difficulty:'easy', tags:['UPDATE'], type:'dml', table:'employees', pk:'emp_id',
-    text:"Update the salary of the employee with emp_id 3 to 45000.",
-    hint:"UPDATE employees SET salary = 45000 WHERE emp_id = 3;",
-    sql:"UPDATE employees SET salary = 45000 WHERE emp_id = 3;" },
-  { id:7, difficulty:'easy', tags:['DELETE'], type:'dml', table:'employees', pk:'emp_id',
-    text:"Delete the employee with emp_id 10 from the employees table.",
-    hint:"DELETE FROM employees WHERE emp_id = 10;",
-    sql:"DELETE FROM employees WHERE emp_id = 10;" },
-  { id:8, difficulty:'medium', tags:['JOIN'], type:'select', orderMatters:false,
-    text:"List every employee's name together with their department's name.",
-    hint:"JOIN employees to departments ON matching dept_id.",
-    sql:"SELECT e.emp_name, d.dept_name FROM employees e JOIN departments d ON e.dept_id = d.dept_id;" },
-  { id:9, difficulty:'medium', tags:['JOIN'], type:'select', orderMatters:false,
-    text:"Show the names and department location of employees who work in the 'IT' department.",
-    hint:"Join the two tables, then filter WHERE dept_name = 'IT'.",
-    sql:"SELECT e.emp_name, d.location FROM employees e JOIN departments d ON e.dept_id = d.dept_id WHERE d.dept_name = 'IT';" },
-  { id:10, difficulty:'medium', tags:['GROUP BY','COUNT'], type:'select', orderMatters:false,
-    text:"Count how many employees belong to each department. Show dept_id and the count.",
-    hint:"GROUP BY dept_id, then use COUNT(*).",
-    sql:"SELECT dept_id, COUNT(*) FROM employees GROUP BY dept_id;" },
-  { id:11, difficulty:'medium', tags:['GROUP BY','SUM'], type:'select', orderMatters:false,
-    text:"Show the total salary paid per department (dept_id and total salary).",
-    hint:"GROUP BY dept_id, then use SUM(salary).",
-    sql:"SELECT dept_id, SUM(salary) FROM employees GROUP BY dept_id;" },
-  { id:12, difficulty:'medium', tags:['GROUP BY','AVG'], type:'select', orderMatters:false,
-    text:"Show the average salary per department (dept_id and average salary).",
-    hint:"GROUP BY dept_id, then use AVG(salary).",
-    sql:"SELECT dept_id, AVG(salary) FROM employees GROUP BY dept_id;" },
-  { id:13, difficulty:'hard', tags:['GROUP BY','HAVING','COUNT'], type:'select', orderMatters:false,
-    text:"Show only the departments that have more than 2 employees (dept_id and count).",
-    hint:"GROUP BY dept_id, then HAVING COUNT(*) > 2.",
-    sql:"SELECT dept_id, COUNT(*) FROM employees GROUP BY dept_id HAVING COUNT(*) > 2;" },
-  { id:14, difficulty:'hard', tags:['GROUP BY','HAVING','AVG'], type:'select', orderMatters:false,
-    text:"Show departments where the average employee salary is above 30000 (dept_id and average salary).",
-    hint:"GROUP BY dept_id, then HAVING AVG(salary) > 30000.",
-    sql:"SELECT dept_id, AVG(salary) FROM employees GROUP BY dept_id HAVING AVG(salary) > 30000;" },
-  { id:15, difficulty:'easy', tags:['MAX'], type:'select', orderMatters:false,
-    text:"Find the highest salary among all employees.",
-    hint:"SELECT MAX(salary) FROM employees;",
-    sql:"SELECT MAX(salary) FROM employees;" },
-  { id:16, difficulty:'easy', tags:['MIN'], type:'select', orderMatters:false,
-    text:"Find the lowest salary among all employees.",
-    hint:"SELECT MIN(salary) FROM employees;",
-    sql:"SELECT MIN(salary) FROM employees;" },
-  { id:17, difficulty:'easy', tags:['COUNT'], type:'select', orderMatters:false,
-    text:"Count the total number of employees in the company.",
-    hint:"SELECT COUNT(*) FROM employees;",
-    sql:"SELECT COUNT(*) FROM employees;" },
-  { id:18, difficulty:'easy', tags:['SUM'], type:'select', orderMatters:false,
-    text:"Find the combined total of all employee salaries.",
-    hint:"SELECT SUM(salary) FROM employees;",
-    sql:"SELECT SUM(salary) FROM employees;" },
-  { id:19, difficulty:'hard', tags:['JOIN','GROUP BY','COUNT'], type:'select', orderMatters:false,
-    text:"Show each department's name together with the number of employees in it, using a JOIN.",
-    hint:"Join departments to employees, GROUP BY dept_name, use COUNT(emp_id).",
-    sql:"SELECT d.dept_name, COUNT(e.emp_id) FROM departments d JOIN employees e ON d.dept_id = e.dept_id GROUP BY d.dept_name;" },
-  { id:20, difficulty:'hard', tags:['JOIN','GROUP BY','HAVING','AVG'], type:'select', orderMatters:false,
-    text:"Using a JOIN, show department names where the average employee salary is above 30000.",
-    hint:"Join, GROUP BY dept_name, then HAVING AVG(salary) > 30000.",
-    sql:"SELECT d.dept_name, AVG(e.salary) FROM departments d JOIN employees e ON d.dept_id = e.dept_id GROUP BY d.dept_name HAVING AVG(e.salary) > 30000;" },
-  { id:21, difficulty:'medium', tags:['UPDATE'], type:'dml', table:'employees', pk:'emp_id',
-    text:"Give every employee in dept_id 3 a 10% salary increase.",
-    hint:"UPDATE employees SET salary = salary * 1.1 WHERE dept_id = 3;",
-    sql:"UPDATE employees SET salary = salary * 1.1 WHERE dept_id = 3;" },
-  { id:22, difficulty:'easy', tags:['SELECT'], type:'select', orderMatters:false,
-    text:"Show employees in dept_id 1 who also earn more than 30000 (combine two conditions).",
-    hint:"Combine two conditions with AND in the WHERE clause.",
-    sql:"SELECT * FROM employees WHERE dept_id = 1 AND salary > 30000;" },
-  { id:23, difficulty:'easy', tags:['SELECT'], type:'select', orderMatters:false,
-    text:"Show employees whose age is between 25 and 35, inclusive.",
-    hint:"Use WHERE age BETWEEN 25 AND 35.",
-    sql:"SELECT * FROM employees WHERE age BETWEEN 25 AND 35;" },
-  { id:24, difficulty:'easy', tags:['SELECT'], type:'select', orderMatters:false,
-    text:"Show employees who belong to dept_id 1, 3, or 5.",
-    hint:"Use WHERE dept_id IN (1, 3, 5).",
-    sql:"SELECT * FROM employees WHERE dept_id IN (1,3,5);" },
-  { id:25, difficulty:'easy', tags:['INSERT'], type:'dml', table:'departments', pk:'dept_id',
-    text:"Insert a new department: dept_id 6, dept_name 'Legal', location 'Annex C'.",
-    hint:"INSERT INTO departments (columns...) VALUES (values...);",
-    sql:"INSERT INTO departments (dept_id, dept_name, location) VALUES (6, 'Legal', 'Annex C');" },
-  { id:26, difficulty:'easy', tags:['UPDATE'], type:'dml', table:'employees', pk:'emp_id',
-    text:"Move Ana Lim to dept_id 3.",
-    hint:"UPDATE employees SET dept_id = 3 WHERE emp_name = 'Ana Lim';",
-    sql:"UPDATE employees SET dept_id = 3 WHERE emp_name = 'Ana Lim';" },
-  { id:27, difficulty:'easy', tags:['DELETE'], type:'dml', table:'employees', pk:'emp_id',
-    text:"Delete all employees older than 45.",
-    hint:"DELETE FROM employees WHERE age > 45;",
-    sql:"DELETE FROM employees WHERE age > 45;" },
-  { id:28, difficulty:'hard', tags:['JOIN','SUM'], type:'select', orderMatters:false,
-    text:"Using a JOIN, show the total salary of employees in the 'Finance' department.",
-    hint:"Join the tables, filter WHERE dept_name = 'Finance', then SUM(e.salary).",
-    sql:"SELECT SUM(e.salary) FROM employees e JOIN departments d ON e.dept_id = d.dept_id WHERE d.dept_name = 'Finance';" },
-  { id:29, difficulty:'medium', tags:['GROUP BY','MAX'], type:'select', orderMatters:false,
-    text:"Show the highest salary within each department (dept_id and max salary).",
-    hint:"GROUP BY dept_id, then use MAX(salary).",
-    sql:"SELECT dept_id, MAX(salary) FROM employees GROUP BY dept_id;" },
-  { id:30, difficulty:'hard', tags:['GROUP BY','HAVING','MIN'], type:'select', orderMatters:false,
-    text:"Show departments where the lowest salary is below 28000 (dept_id and min salary).",
-    hint:"GROUP BY dept_id, then HAVING MIN(salary) < 28000.",
-    sql:"SELECT dept_id, MIN(salary) FROM employees GROUP BY dept_id HAVING MIN(salary) < 28000;" },
+  {
+    id: 1, difficulty: 'easy', tags: ['SELECT'], type: 'select', orderMatters: false,
+    text: "Select all columns and all rows from the employees table.",
+    hint: "Use SELECT * with a FROM clause — no WHERE needed.",
+    sql: "SELECT * FROM employees;"
+  },
+  {
+    id: 2, difficulty: 'easy', tags: ['SELECT'], type: 'select', orderMatters: false,
+    text: "Show all employees whose salary is greater than 30000.",
+    hint: "Add a WHERE clause using the greater-than operator on salary.",
+    sql: "SELECT * FROM employees WHERE salary > 30000;"
+  },
+  {
+    id: 3, difficulty: 'medium', tags: ['SELECT'], type: 'select', orderMatters: true,
+    text: "Display emp_name and salary of every employee, ordered by salary from highest to lowest.",
+    hint: "Use ORDER BY salary DESC.",
+    sql: "SELECT emp_name, salary FROM employees ORDER BY salary DESC;"
+  },
+  {
+    id: 4, difficulty: 'easy', tags: ['SELECT'], type: 'select', orderMatters: false,
+    text: "Find all employees whose name starts with the letter 'A'.",
+    hint: "Use WHERE emp_name LIKE 'A%'.",
+    sql: "SELECT * FROM employees WHERE emp_name LIKE 'A%';"
+  },
+  {
+    id: 5, difficulty: 'easy', tags: ['INSERT'], type: 'dml', table: 'employees', pk: 'emp_id',
+    text: "Insert a new employee: emp_id 16, emp_name 'Grace Lim', dept_id 2, salary 28000, hire_date '2024-01-15', age 26.",
+    hint: "INSERT INTO employees (columns...) VALUES (values...);",
+    sql: "INSERT INTO employees (emp_id, emp_name, dept_id, salary, hire_date, age) VALUES (16, 'Grace Lim', 2, 28000, '2024-01-15', 26);"
+  },
+  {
+    id: 6, difficulty: 'easy', tags: ['UPDATE'], type: 'dml', table: 'employees', pk: 'emp_id',
+    text: "Update the salary of the employee with emp_id 3 to 45000.",
+    hint: "UPDATE employees SET salary = 45000 WHERE emp_id = 3;",
+    sql: "UPDATE employees SET salary = 45000 WHERE emp_id = 3;"
+  },
+  {
+    id: 7, difficulty: 'easy', tags: ['DELETE'], type: 'dml', table: 'employees', pk: 'emp_id',
+    text: "Delete the employee with emp_id 10 from the employees table.",
+    hint: "DELETE FROM employees WHERE emp_id = 10;",
+    sql: "DELETE FROM employees WHERE emp_id = 10;"
+  },
+  {
+    id: 8, difficulty: 'medium', tags: ['JOIN'], type: 'select', orderMatters: false,
+    text: "List every employee's name together with their department's name.",
+    hint: "JOIN employees to departments ON matching dept_id.",
+    sql: "SELECT e.emp_name, d.dept_name FROM employees e JOIN departments d ON e.dept_id = d.dept_id;"
+  },
+  {
+    id: 9, difficulty: 'medium', tags: ['JOIN'], type: 'select', orderMatters: false,
+    text: "Show the names and department location of employees who work in the 'IT' department.",
+    hint: "Join the two tables, then filter WHERE dept_name = 'IT'.",
+    sql: "SELECT e.emp_name, d.location FROM employees e JOIN departments d ON e.dept_id = d.dept_id WHERE d.dept_name = 'IT';"
+  },
+  {
+    id: 10, difficulty: 'medium', tags: ['GROUP BY', 'COUNT'], type: 'select', orderMatters: false,
+    text: "Count how many employees belong to each department. Show dept_id and the count.",
+    hint: "GROUP BY dept_id, then use COUNT(*).",
+    sql: "SELECT dept_id, COUNT(*) FROM employees GROUP BY dept_id;"
+  },
+  {
+    id: 11, difficulty: 'medium', tags: ['GROUP BY', 'SUM'], type: 'select', orderMatters: false,
+    text: "Show the total salary paid per department (dept_id and total salary).",
+    hint: "GROUP BY dept_id, then use SUM(salary).",
+    sql: "SELECT dept_id, SUM(salary) FROM employees GROUP BY dept_id;"
+  },
+  {
+    id: 12, difficulty: 'medium', tags: ['GROUP BY', 'AVG'], type: 'select', orderMatters: false,
+    text: "Show the average salary per department (dept_id and average salary).",
+    hint: "GROUP BY dept_id, then use AVG(salary).",
+    sql: "SELECT dept_id, AVG(salary) FROM employees GROUP BY dept_id;"
+  },
+  {
+    id: 13, difficulty: 'hard', tags: ['GROUP BY', 'HAVING', 'COUNT'], type: 'select', orderMatters: false,
+    text: "Show only the departments that have more than 2 employees (dept_id and count).",
+    hint: "GROUP BY dept_id, then HAVING COUNT(*) > 2.",
+    sql: "SELECT dept_id, COUNT(*) FROM employees GROUP BY dept_id HAVING COUNT(*) > 2;"
+  },
+  {
+    id: 14, difficulty: 'hard', tags: ['GROUP BY', 'HAVING', 'AVG'], type: 'select', orderMatters: false,
+    text: "Show departments where the average employee salary is above 30000 (dept_id and average salary).",
+    hint: "GROUP BY dept_id, then HAVING AVG(salary) > 30000.",
+    sql: "SELECT dept_id, AVG(salary) FROM employees GROUP BY dept_id HAVING AVG(salary) > 30000;"
+  },
+  {
+    id: 15, difficulty: 'easy', tags: ['MAX'], type: 'select', orderMatters: false,
+    text: "Find the highest salary among all employees.",
+    hint: "SELECT MAX(salary) FROM employees;",
+    sql: "SELECT MAX(salary) FROM employees;"
+  },
+  {
+    id: 16, difficulty: 'easy', tags: ['MIN'], type: 'select', orderMatters: false,
+    text: "Find the lowest salary among all employees.",
+    hint: "SELECT MIN(salary) FROM employees;",
+    sql: "SELECT MIN(salary) FROM employees;"
+  },
+  {
+    id: 17, difficulty: 'easy', tags: ['COUNT'], type: 'select', orderMatters: false,
+    text: "Count the total number of employees in the company.",
+    hint: "SELECT COUNT(*) FROM employees;",
+    sql: "SELECT COUNT(*) FROM employees;"
+  },
+  {
+    id: 18, difficulty: 'easy', tags: ['SUM'], type: 'select', orderMatters: false,
+    text: "Find the combined total of all employee salaries.",
+    hint: "SELECT SUM(salary) FROM employees;",
+    sql: "SELECT SUM(salary) FROM employees;"
+  },
+  {
+    id: 19, difficulty: 'hard', tags: ['JOIN', 'GROUP BY', 'COUNT'], type: 'select', orderMatters: false,
+    text: "Show each department's name together with the number of employees in it, using a JOIN.",
+    hint: "Join departments to employees, GROUP BY dept_name, use COUNT(emp_id).",
+    sql: "SELECT d.dept_name, COUNT(e.emp_id) FROM departments d JOIN employees e ON d.dept_id = e.dept_id GROUP BY d.dept_name;"
+  },
+  {
+    id: 20, difficulty: 'hard', tags: ['JOIN', 'GROUP BY', 'HAVING', 'AVG'], type: 'select', orderMatters: false,
+    text: "Using a JOIN, show department names where the average employee salary is above 30000.",
+    hint: "Join, GROUP BY dept_name, then HAVING AVG(salary) > 30000.",
+    sql: "SELECT d.dept_name, AVG(e.salary) FROM departments d JOIN employees e ON d.dept_id = e.dept_id GROUP BY d.dept_name HAVING AVG(e.salary) > 30000;"
+  },
+  {
+    id: 21, difficulty: 'medium', tags: ['UPDATE'], type: 'dml', table: 'employees', pk: 'emp_id',
+    text: "Give every employee in dept_id 3 a 10% salary increase.",
+    hint: "UPDATE employees SET salary = salary * 1.1 WHERE dept_id = 3;",
+    sql: "UPDATE employees SET salary = salary * 1.1 WHERE dept_id = 3;"
+  },
+  {
+    id: 22, difficulty: 'easy', tags: ['SELECT'], type: 'select', orderMatters: false,
+    text: "Show employees in dept_id 1 who also earn more than 30000 (combine two conditions).",
+    hint: "Combine two conditions with AND in the WHERE clause.",
+    sql: "SELECT * FROM employees WHERE dept_id = 1 AND salary > 30000;"
+  },
+  {
+    id: 23, difficulty: 'easy', tags: ['SELECT'], type: 'select', orderMatters: false,
+    text: "Show employees whose age is between 25 and 35, inclusive.",
+    hint: "Use WHERE age BETWEEN 25 AND 35.",
+    sql: "SELECT * FROM employees WHERE age BETWEEN 25 AND 35;"
+  },
+  {
+    id: 24, difficulty: 'easy', tags: ['SELECT'], type: 'select', orderMatters: false,
+    text: "Show employees who belong to dept_id 1, 3, or 5.",
+    hint: "Use WHERE dept_id IN (1, 3, 5).",
+    sql: "SELECT * FROM employees WHERE dept_id IN (1,3,5);"
+  },
+  {
+    id: 25, difficulty: 'easy', tags: ['INSERT'], type: 'dml', table: 'departments', pk: 'dept_id',
+    text: "Insert a new department: dept_id 6, dept_name 'Legal', location 'Annex C'.",
+    hint: "INSERT INTO departments (columns...) VALUES (values...);",
+    sql: "INSERT INTO departments (dept_id, dept_name, location) VALUES (6, 'Legal', 'Annex C');"
+  },
+  {
+    id: 26, difficulty: 'easy', tags: ['UPDATE'], type: 'dml', table: 'employees', pk: 'emp_id',
+    text: "Move Ana Lim to dept_id 3.",
+    hint: "UPDATE employees SET dept_id = 3 WHERE emp_name = 'Ana Lim';",
+    sql: "UPDATE employees SET dept_id = 3 WHERE emp_name = 'Ana Lim';"
+  },
+  {
+    id: 27, difficulty: 'easy', tags: ['DELETE'], type: 'dml', table: 'employees', pk: 'emp_id',
+    text: "Delete all employees older than 45.",
+    hint: "DELETE FROM employees WHERE age > 45;",
+    sql: "DELETE FROM employees WHERE age > 45;"
+  },
+  {
+    id: 28, difficulty: 'hard', tags: ['JOIN', 'SUM'], type: 'select', orderMatters: false,
+    text: "Using a JOIN, show the total salary of employees in the 'Finance' department.",
+    hint: "Join the tables, filter WHERE dept_name = 'Finance', then SUM(e.salary).",
+    sql: "SELECT SUM(e.salary) FROM employees e JOIN departments d ON e.dept_id = d.dept_id WHERE d.dept_name = 'Finance';"
+  },
+  {
+    id: 29, difficulty: 'medium', tags: ['GROUP BY', 'MAX'], type: 'select', orderMatters: false,
+    text: "Show the highest salary within each department (dept_id and max salary).",
+    hint: "GROUP BY dept_id, then use MAX(salary).",
+    sql: "SELECT dept_id, MAX(salary) FROM employees GROUP BY dept_id;"
+  },
+  {
+    id: 30, difficulty: 'hard', tags: ['GROUP BY', 'HAVING', 'MIN'], type: 'select', orderMatters: false,
+    text: "Show departments where the lowest salary is below 28000 (dept_id and min salary).",
+    hint: "GROUP BY dept_id, then HAVING MIN(salary) < 28000.",
+    sql: "SELECT dept_id, MIN(salary) FROM employees GROUP BY dept_id HAVING MIN(salary) < 28000;"
+  },
 ];
-const ALL_TAGS = ['SELECT','INSERT','UPDATE','DELETE','JOIN','GROUP BY','HAVING','COUNT','SUM','AVG','MIN','MAX'];
+const ALL_TAGS = ['SELECT', 'INSERT', 'UPDATE', 'DELETE', 'JOIN', 'GROUP BY', 'HAVING', 'COUNT', 'SUM', 'AVG', 'MIN', 'MAX'];
 
 /* ============================= STATE ============================= */
 let SQL = null;
@@ -212,11 +272,11 @@ initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.2.
   })
   .catch(err => {
     const sub = document.querySelector('#nameModalOverlay .modal > div[style*="text-faint"]');
-    if(sub) sub.textContent = 'Failed to load the SQL engine. Check your internet connection and reload.';
+    if (sub) sub.textContent = 'Failed to load the SQL engine. Check your internet connection and reload.';
     console.error(err);
   });
 
-function selectMode(mode){
+function selectMode(mode) {
   currentMode = mode;
 
   // Toggle visual selection state on mode cards
@@ -228,61 +288,61 @@ function selectMode(mode){
   const difficultyWrap = document.getElementById('difficultyWrap');
   const startBtn = document.getElementById('startExamBtn');
 
-  if(sub){
+  if (sub) {
     sub.textContent = mode === 'practice'
       ? 'Practice mode: unlimited attempts, free hints, no score penalty.'
       : 'Exam mode: one attempt per student. The exam uses the full question bank.';
   }
 
   // Difficulty is available ONLY in Practice Mode.
-  if(difficultyWrap) difficultyWrap.style.display = mode === 'practice' ? 'block' : 'none';
+  if (difficultyWrap) difficultyWrap.style.display = mode === 'practice' ? 'block' : 'none';
 
   // Practice mode does not require a name; Exam mode does.
-  if(nameWrap) nameWrap.style.display = mode === 'practice' ? 'none' : 'block';
-  if(startBtn){
+  if (nameWrap) nameWrap.style.display = mode === 'practice' ? 'none' : 'block';
+  if (startBtn) {
     startBtn.disabled = false;
     startBtn.textContent = mode === 'practice' ? 'Start Practice →' : 'Start Exam →';
   }
 
-  if(mode === 'exam'){
+  if (mode === 'exam') {
     const input = document.getElementById('studentNameInput');
-    if(input){
+    if (input) {
       input.disabled = false;
       setTimeout(() => input.focus(), 0);
     }
   }
 }
 
-function backToModeChoices(){
+function backToModeChoices() {
   stopTimer();
   const input = document.getElementById('studentNameInput');
-  if(input) input.value = '';
+  if (input) input.value = '';
   const err = document.getElementById('nameError');
-  if(err) err.style.display = 'none';
+  if (err) err.style.display = 'none';
   selectMode('practice');
 }
 
-function selectDifficulty(difficulty){
-  if(currentMode !== 'practice') return;
+function selectDifficulty(difficulty) {
+  if (currentMode !== 'practice') return;
   selectedDifficulty = difficulty;
   document.querySelectorAll('.diff-pill').forEach(el => el.classList.remove('selected'));
   const pill = document.getElementById(`diffPill${difficulty.charAt(0).toUpperCase() + difficulty.slice(1)}`);
-  if(pill) pill.classList.add('selected');
+  if (pill) pill.classList.add('selected');
 }
 
-function unlockNameModal(){
+function unlockNameModal() {
   studentName = '';
   document.getElementById('studentLabel').textContent = '—';
   const input = document.getElementById('studentNameInput');
-  if(input) {
+  if (input) {
     input.value = '';
     input.disabled = false;
   }
   const errEl = document.getElementById('nameError');
-  if(errEl) errEl.style.display = 'none';
+  if (errEl) errEl.style.display = 'none';
 
   const sub = document.getElementById('modalSubtext');
-  if(sub) sub.textContent = 'Select Practice Mode or Exam Mode to continue.';
+  if (sub) sub.textContent = 'Select Practice Mode or Exam Mode to continue.';
   selectMode(currentMode);
 }
 
@@ -291,16 +351,29 @@ document.getElementById('backBtn').addEventListener('click', () => {
   promptNewStudent();
 });
 document.getElementById('studentNameInput').addEventListener('keydown', (e) => {
-  if(e.key === 'Enter'){ e.preventDefault(); submitStudentName(); }
+  if (e.key === 'Enter') { e.preventDefault(); submitStudentName(); }
 });
 
-function submitStudentName(){
+function isNameTaken(name) {
+  if (!name) return false;
+  const lower = name.trim().toLowerCase();
+  return leaderboard.some(entry => entry.name && entry.name.trim().toLowerCase() === lower);
+}
+
+function submitStudentName() {
   const input = document.getElementById('studentNameInput');
   const errEl = document.getElementById('nameError');
 
-  if(currentMode === 'practice'){
+  const name = input.value.trim();
+
+  if (currentMode === 'practice') {
     // Practice mode: name is optional — no need to enter one to start.
-    const name = input.value.trim();
+    if (name && isNameTaken(name)) {
+      errEl.textContent = 'This name has already been used on the leaderboard. Please enter a different name.';
+      errEl.style.display = 'block';
+      input.focus();
+      return;
+    }
     errEl.style.display = 'none';
     studentName = name || 'Practice Student';
     document.getElementById('studentLabel').textContent = studentName;
@@ -309,12 +382,20 @@ function submitStudentName(){
     return;
   }
 
-  const name = input.value.trim();
-  if(!name){
+  if (!name) {
+    errEl.textContent = 'Please enter your name before starting.';
     errEl.style.display = 'block';
     input.focus();
     return;
   }
+
+  if (isNameTaken(name)) {
+    errEl.textContent = 'This name has already been used on the leaderboard. Please enter a different name.';
+    errEl.style.display = 'block';
+    input.focus();
+    return;
+  }
+
   errEl.style.display = 'none';
   studentName = name;
   document.getElementById('studentLabel').textContent = studentName;
@@ -323,7 +404,7 @@ function submitStudentName(){
 }
 
 /* ============================= TURN FLOW (one student, one question) ============================= */
-function beginStudentTurn(){
+function beginStudentTurn() {
   hintUsed = false;
   timerStarted = false;
   turnSubmitted = false;
@@ -334,7 +415,7 @@ function beginStudentTurn(){
   const banner = document.getElementById('modeBanner');
   const bannerText = document.getElementById('modeBannerText');
   banner.style.display = 'flex';
-  if(currentMode === 'practice'){
+  if (currentMode === 'practice') {
     banner.className = 'mode-banner practice';
     bannerText.textContent = '🧪 Practice Mode — unlimited attempts, hints free, no penalty';
     document.getElementById('tryAgainBtn').style.display = 'none';
@@ -347,12 +428,12 @@ function beginStudentTurn(){
   // Practice Mode can filter by difficulty. Exam Mode ignores difficulty and uses all questions.
   const candidates = currentMode === 'practice' && selectedDifficulty !== 'all'
     ? pool.filter(qid => {
-        const q = QUESTIONS.find(item => item.id === qid);
-        return q && q.difficulty === selectedDifficulty;
-      })
+      const q = QUESTIONS.find(item => item.id === qid);
+      return q && q.difficulty === selectedDifficulty;
+    })
     : pool;
 
-  if(candidates.length === 0){
+  if (candidates.length === 0) {
     showBankExhausted();
     return;
   }
@@ -365,23 +446,23 @@ function beginStudentTurn(){
   // Skip button — only relevant in practice mode, where a student can move on freely.
   document.getElementById('skipBtn').style.display = currentMode === 'practice' ? 'inline-block' : 'none';
 
-  if(currentMode === 'practice'){
+  if (currentMode === 'practice') {
     // In practice mode: no timer, always show hint button freely
     const chip = document.getElementById('timerChip');
     chip.textContent = '∞ no time limit';
-    chip.classList.remove('warn','expired');
+    chip.classList.remove('warn', 'expired');
   } else {
     resetTimerIdle();
   }
   updateHud();
 }
 
-function promptNewStudent(){
+function promptNewStudent() {
   stopTimer();
   studentName = '';
   document.getElementById('studentLabel').textContent = '—';
 
-  if(currentMode === 'exam'){
+  if (currentMode === 'exam') {
     // Show the lightweight next-student modal instead of the full setup modal
     const inp = document.getElementById('nextStudentNameInput');
     inp.value = '';
@@ -398,11 +479,18 @@ function promptNewStudent(){
 }
 
 /* ---- Next-student modal handlers (exam mode) ---- */
-function submitNextStudent(){
+function submitNextStudent() {
   const inp = document.getElementById('nextStudentNameInput');
   const errEl = document.getElementById('nextStudentNameError');
   const name = inp.value.trim();
-  if(!name){
+  if (!name) {
+    errEl.textContent = "Please enter the student's name before starting.";
+    errEl.style.display = 'block';
+    inp.focus();
+    return;
+  }
+  if (isNameTaken(name)) {
+    errEl.textContent = 'This name has already been used on the leaderboard. Please enter a different name.';
     errEl.style.display = 'block';
     inp.focus();
     return;
@@ -416,7 +504,7 @@ function submitNextStudent(){
 
 document.getElementById('nextStudentStartBtn').addEventListener('click', submitNextStudent);
 document.getElementById('nextStudentNameInput').addEventListener('keydown', (e) => {
-  if(e.key === 'Enter'){ e.preventDefault(); submitNextStudent(); }
+  if (e.key === 'Enter') { e.preventDefault(); submitNextStudent(); }
 });
 document.getElementById('nextStudentBackBtn').addEventListener('click', () => {
   // Go back to the full setup modal so the user can switch modes
@@ -425,16 +513,16 @@ document.getElementById('nextStudentBackBtn').addEventListener('click', () => {
   unlockNameModal();
 });
 
-function showBankExhausted(){
+function showBankExhausted() {
   document.getElementById('qCategoryTitle').textContent = 'question bank';
   document.getElementById('qTagsRow').innerHTML = '';
   const label = currentMode === 'practice' && selectedDifficulty !== 'all'
     ? `All ${selectedDifficulty} questions have already been used this session. Choose another difficulty or reset the question bank.`
     : 'All questions have already been used this session. Ask your teacher to reset the question bank to continue.';
   document.getElementById('qText').textContent = label;
-  document.getElementById('hintLine').classList.remove('show','auto');
+  document.getElementById('hintLine').classList.remove('show', 'auto');
   document.getElementById('timerChip').textContent = '⏱ —';
-  document.getElementById('timerChip').classList.remove('warn','expired');
+  document.getElementById('timerChip').classList.remove('warn', 'expired');
   document.getElementById('queryInput').value = '';
   document.getElementById('queryInput').disabled = true;
   document.getElementById('submitBtn').disabled = true;
@@ -442,17 +530,17 @@ function showBankExhausted(){
   document.getElementById('skipBtn').style.display = 'none';
   document.getElementById('resultArea').innerHTML = '<div class="empty-msg">No question available — the bank is empty.</div>';
   document.getElementById('rowCount').style.display = 'none';
-  document.getElementById('feedbackBox').classList.remove('show','correct','wrong');
+  document.getElementById('feedbackBox').classList.remove('show', 'correct', 'wrong');
   updateScoreMeter('');
 }
 
-function resetQuestionBank(){
+function resetQuestionBank() {
   pool = QUESTIONS.map(q => q.id);
   updateHud();
 }
 
 document.getElementById('resetBankBtn').addEventListener('click', () => {
-  if(confirm('Reset the question bank so all 30 questions can be used again this session? Leaderboard history is kept.')){
+  if (confirm('Reset the question bank so all 30 questions can be used again this session? Leaderboard history is kept.')) {
     resetQuestionBank();
   }
 });
@@ -461,8 +549,8 @@ document.getElementById('restartBtn').addEventListener('click', () => {
   const msg = currentMode === 'practice'
     ? "Switch to a new student? The current practice session will end."
     : "End this student's turn and let a new student enter their name? Nothing will be scored for the current question.";
-  if(confirm(msg)){
-    if(currentQ && !turnSubmitted){ pool.push(currentQ.id); } // don't waste an unused question
+  if (confirm(msg)) {
+    if (currentQ && !turnSubmitted) { pool.push(currentQ.id); } // don't waste an unused question
     document.getElementById('tryAgainBtn').style.display = 'none';
     promptNewStudent();
   }
@@ -483,7 +571,7 @@ const firebaseConfig = {
 let dbRef = null;
 let isFirebaseConfigured = false;
 
-function initFirebase(){
+function initFirebase() {
   if (typeof firebase !== 'undefined' && firebaseConfig.apiKey && firebaseConfig.apiKey !== "YOUR_API_KEY") {
     try {
       if (!firebase.apps.length) {
@@ -492,7 +580,7 @@ function initFirebase(){
       dbRef = firebase.database().ref('leaderboard');
       isFirebaseConfigured = true;
       console.log('Firebase Cloud Database initialized successfully.');
-    } catch(e) {
+    } catch (e) {
       console.warn('Firebase init failed, falling back to LocalStorage:', e);
       isFirebaseConfigured = false;
     }
@@ -501,7 +589,7 @@ function initFirebase(){
   }
 }
 
-function loadLeaderboard(){
+function loadLeaderboard() {
   initFirebase();
   if (isFirebaseConfigured && dbRef) {
     dbRef.on('value', (snapshot) => {
@@ -514,23 +602,23 @@ function loadLeaderboard(){
       renderLeaderboard();
     });
   } else {
-    try{
+    try {
       const raw = localStorage.getItem(LEADERBOARD_KEY);
       leaderboard = raw ? JSON.parse(raw) : [];
-    }catch(e){
+    } catch (e) {
       leaderboard = [];
     }
     renderLeaderboard();
   }
 }
 
-function saveLeaderboard(){
+function saveLeaderboard() {
   if (!isFirebaseConfigured) {
-    try{ localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(leaderboard)); }catch(e){ /* storage unavailable — ignore */ }
+    try { localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(leaderboard)); } catch (e) { /* storage unavailable — ignore */ }
   }
 }
 
-function addToLeaderboard(name, score, maxScore, question){
+function addToLeaderboard(name, score, maxScore, question) {
   const entry = {
     name,
     score,
@@ -549,57 +637,92 @@ function addToLeaderboard(name, score, maxScore, question){
   }
 }
 
-function renderLeaderboard(){
+function renderLeaderboard() {
   const area = document.getElementById('leaderboardArea');
   const countEl = document.getElementById('leaderboardCount');
-  countEl.textContent = `${leaderboard.length} ${leaderboard.length === 1 ? 'entry' : 'entries'}`;
-  if(leaderboard.length === 0){
-    area.innerHTML = '<div class="empty-msg">No one has finished the exam yet — scores will appear here as students complete it.</div>';
+  const modalArea = document.getElementById('modalLeaderboardArea');
+  const modalCountEl = document.getElementById('modalLeaderboardCount');
+
+  const countText = `${leaderboard.length} ${leaderboard.length === 1 ? 'entry' : 'entries'}`;
+  if (countEl) countEl.textContent = countText;
+  if (modalCountEl) modalCountEl.textContent = countText;
+
+  if (leaderboard.length === 0) {
+    const emptyHTML = '<div class="empty-msg">No one has finished the exam yet — scores will appear here as students complete it.</div>';
+    if (area) area.innerHTML = emptyHTML;
+    if (modalArea) modalArea.innerHTML = emptyHTML;
     return;
   }
-  const sorted = leaderboard.slice().sort((a,b) => b.score - a.score);
+  const sorted = leaderboard.slice().sort((a, b) => b.score - a.score);
   let h = '<table><thead><tr><th>#</th><th>name</th><th>question</th><th>score</th><th>%</th><th>completed</th></tr></thead><tbody>';
   sorted.forEach((entry, i) => {
-    h += `<tr><td>${i+1}</td><td>${escapeHTML(entry.name)}</td><td>${escapeHTML(entry.topic || '—')}</td><td>${entry.score} / ${entry.maxScore}</td><td>${entry.pct}%</td><td>${escapeHTML(entry.date)}</td></tr>`;
+    h += `<tr><td>${i + 1}</td><td>${escapeHTML(entry.name)}</td><td>${escapeHTML(entry.topic || '—')}</td><td>${entry.score} / ${entry.maxScore}</td><td>${entry.pct}%</td><td>${escapeHTML(entry.date)}</td></tr>`;
   });
   h += '</tbody></table>';
-  area.innerHTML = h;
+  if (area) area.innerHTML = h;
+  if (modalArea) modalArea.innerHTML = h;
 }
 
-document.getElementById('clearLeaderboardBtn').addEventListener('click', () => {
-  if(confirm('Clear the entire leaderboard? This removes every recorded student score and cannot be undone.')){
-    if (isFirebaseConfigured && dbRef) {
-      dbRef.remove();
-    } else {
-      leaderboard = [];
-      saveLeaderboard();
-      renderLeaderboard();
+const CLEAR_LEADERBOARD_PASSWORD = "iamatomic";
+
+function clearLeaderboardWithPassword() {
+  const pass = prompt('Enter password to clear leaderboard:');
+  if (pass === null) return; // user cancelled prompt
+  if (pass.trim() === CLEAR_LEADERBOARD_PASSWORD) {
+    if (confirm('Clear the entire leaderboard? This removes every recorded student score and cannot be undone.')) {
+      if (isFirebaseConfigured && dbRef) {
+        dbRef.remove();
+      } else {
+        leaderboard = [];
+        saveLeaderboard();
+        renderLeaderboard();
+      }
+      alert('Leaderboard cleared successfully.');
     }
+  } else {
+    alert('Incorrect password! Leaderboard was not cleared.');
   }
-});
+}
+
+document.getElementById('clearLeaderboardBtn')?.addEventListener('click', clearLeaderboardWithPassword);
+document.getElementById('modalClearLeaderboardBtn')?.addEventListener('click', clearLeaderboardWithPassword);
+
+function openLeaderboardModal() {
+  renderLeaderboard();
+  document.getElementById('leaderboardModalOverlay')?.classList.add('show');
+}
+
+function closeLeaderboardModal() {
+  document.getElementById('leaderboardModalOverlay')?.classList.remove('show');
+}
+
+document.getElementById('modalLeaderboardBtn')?.addEventListener('click', openLeaderboardModal);
+document.getElementById('nextStudentLeaderboardBtn')?.addEventListener('click', openLeaderboardModal);
+document.getElementById('closeLeaderboardModalBtn')?.addEventListener('click', closeLeaderboardModal);
+document.getElementById('modalLeaderboardCloseBtn')?.addEventListener('click', closeLeaderboardModal);
 
 /* ============================= REFERENCE TABLES ============================= */
-function renderReferenceTables(db){
+function renderReferenceTables(db) {
   const dept = db.exec("SELECT * FROM departments;")[0];
   const emp = db.exec("SELECT * FROM employees;")[0];
   document.getElementById('deptTable').innerHTML = tableHTML(dept.columns, dept.values);
   document.getElementById('empTable').innerHTML = tableHTML(emp.columns, emp.values);
 }
 
-function formatValue(v){
-  if(v === null || v === undefined) return '<span class="null">NULL</span>';
-  if(typeof v === 'number'){
+function formatValue(v) {
+  if (v === null || v === undefined) return '<span class="null">NULL</span>';
+  if (typeof v === 'number') {
     return Number.isInteger(v) ? String(v) : v.toFixed(2);
   }
-  return String(v).replace(/&/g,'&amp;').replace(/</g,'&lt;');
+  return String(v).replace(/&/g, '&amp;').replace(/</g, '&lt;');
 }
 
-function tableHTML(columns, values){
-  if(!columns || columns.length === 0) return '';
+function tableHTML(columns, values) {
+  if (!columns || columns.length === 0) return '';
   let h = '<table><thead><tr>';
   columns.forEach(c => h += `<th>${c}</th>`);
   h += '</tr></thead><tbody>';
-  if(values.length === 0){
+  if (values.length === 0) {
     h += `<tr><td colspan="${columns.length}" style="color:var(--text-faint);font-style:italic;">no rows</td></tr>`;
   } else {
     values.forEach(row => {
@@ -613,11 +736,11 @@ function tableHTML(columns, values){
 }
 
 /* ============================= DB HELPERS ============================= */
-function freshDB(){
+function freshDB() {
   return new SQL.Database(originalBytes.slice());
 }
 
-function normalizeQuotes(sqlText){
+function normalizeQuotes(sqlText) {
   // Fixes SQL that breaks only because of curly/smart quotes introduced by
   // mobile keyboards, Word, or Notes auto-correct — not a real syntax error.
   return sqlText
@@ -625,66 +748,66 @@ function normalizeQuotes(sqlText){
     .replace(/[\u201C\u201D\u201E\u201F]/g, '"');
 }
 
-function runSQL(db, sqlText){
-  try{
+function runSQL(db, sqlText) {
+  try {
     const res = db.exec(normalizeQuotes(sqlText));
-    return { ok:true, res };
-  }catch(e){
-    return { ok:false, error: e.message };
+    return { ok: true, res };
+  } catch (e) {
+    return { ok: false, error: e.message };
   }
 }
 
-function lastResultSet(res){
-  if(!res || res.length === 0) return null;
+function lastResultSet(res) {
+  if (!res || res.length === 0) return null;
   return res[res.length - 1];
 }
 
-function normalizeRows(resultSet){
-  if(!resultSet) return [];
+function normalizeRows(resultSet) {
+  if (!resultSet) return [];
   return resultSet.values.map(row => row.map(v => {
-    if(typeof v === 'number') return Math.round(v * 100) / 100;
+    if (typeof v === 'number') return Math.round(v * 100) / 100;
     return v;
   }));
 }
 
-function rowsEqual(a, b, orderMatters){
-  if(a.length !== b.length) return false;
+function rowsEqual(a, b, orderMatters) {
+  if (a.length !== b.length) return false;
   const A = a.map(r => JSON.stringify(r));
   const B = b.map(r => JSON.stringify(r));
-  if(!orderMatters){ A.sort(); B.sort(); }
-  for(let i=0;i<A.length;i++){ if(A[i] !== B[i]) return false; }
+  if (!orderMatters) { A.sort(); B.sort(); }
+  for (let i = 0; i < A.length; i++) { if (A[i] !== B[i]) return false; }
   return true;
 }
 
 /* ============================= QUESTION FLOW ============================= */
-function renderQuestion(){
+function renderQuestion() {
   document.getElementById('qCategoryTitle').textContent = currentQ.type === 'dml' ? 'question — data modification' : 'question — retrieval';
   const tagsRow = document.getElementById('qTagsRow');
   tagsRow.innerHTML = currentQ.tags.map(t => `<span class="tag">${t}</span>`).join('');
   document.getElementById('qText').textContent = currentQ.text;
   document.getElementById('hintLine').textContent = '💡 ' + currentQ.hint;
-  document.getElementById('hintLine').classList.remove('show','auto');
+  document.getElementById('hintLine').classList.remove('show', 'auto');
   document.getElementById('hintBtn').textContent = '💡 show hint';
 }
 
 /* ============================= TIMER ============================= */
 // The timer does NOT start when the question appears — only once the student
 // actually begins typing a query, so they get unread-limited time to read it first.
-function resetTimerIdle(){
+function resetTimerIdle() {
   stopTimer();
   remainingSeconds = TIME_LIMIT_SECONDS;
   const chip = document.getElementById('timerChip');
-  chip.classList.remove('warn','expired');
+  chip.classList.remove('warn', 'expired');
   chip.textContent = '⏱ 2:00 (starts when you begin typing)';
 }
 
-function startTimer(){
+function startTimer() {
   stopTimer();
   remainingSeconds = TIME_LIMIT_SECONDS;
   updateTimerDisplay();
   timerInterval = setInterval(() => {
     remainingSeconds -= 1;
-    if(remainingSeconds <= 0){
+    if (remainingSeconds <= 0) {
       remainingSeconds = 0;
       updateTimerDisplay();
       stopTimer();
@@ -695,28 +818,28 @@ function startTimer(){
   }, 1000);
 }
 
-function stopTimer(){
-  if(timerInterval){ clearInterval(timerInterval); timerInterval = null; }
+function stopTimer() {
+  if (timerInterval) { clearInterval(timerInterval); timerInterval = null; }
 }
 
-function updateTimerDisplay(){
+function updateTimerDisplay() {
   const chip = document.getElementById('timerChip');
-  if(!chip) return;
+  if (!chip) return;
   const m = Math.floor(remainingSeconds / 60);
   const s = remainingSeconds % 60;
-  chip.textContent = `⏱ ${m}:${String(s).padStart(2,'0')}`;
-  chip.classList.remove('warn','expired');
-  if(remainingSeconds === 0) chip.classList.add('expired');
-  else if(remainingSeconds <= 30) chip.classList.add('warn');
+  chip.textContent = `⏱ ${m}:${String(s).padStart(2, '0')}`;
+  chip.classList.remove('warn', 'expired');
+  if (remainingSeconds === 0) chip.classList.add('expired');
+  else if (remainingSeconds <= 30) chip.classList.add('warn');
 }
 
-function revealHintAuto(){
+function revealHintAuto() {
   const chip = document.getElementById('timerChip');
-  if(chip){ chip.textContent = "⏱ time's up"; chip.classList.add('expired'); }
-  if(!hintUsed){
+  if (chip) { chip.textContent = "⏱ time's up"; chip.classList.add('expired'); }
+  if (!hintUsed) {
     hintUsed = true;
     const el = document.getElementById('hintLine');
-    el.classList.add('show','auto');
+    el.classList.add('show', 'auto');
     document.getElementById('hintBtn').textContent = '💡 hide hint';
   }
   livePreview();
@@ -729,21 +852,21 @@ function revealHintAuto(){
 //   any submitted attempt          -> scaled between 1 and the ceiling below,
 //                                      proportional to how close the result is
 //   ceiling = 50 if the hint was never used, 30 if it was (manual or timeout)
-function calcPoints(similarity, hintUsedFlag){
+function calcPoints(similarity, hintUsedFlag) {
   const ceiling = hintUsedFlag ? REDUCED_MAX_PER_Q : MAX_PER_Q;
   const raw = 1 + Math.max(0, Math.min(1, similarity)) * (ceiling - 1);
   return Math.min(ceiling, Math.max(1, Math.round(raw)));
 }
 
-function updateScoreMeter(studentText){
+function updateScoreMeter(studentText) {
   const valEl = document.getElementById('scoreMeterVal');
   const fillEl = document.getElementById('scoreMeterFill');
   const capEl = document.getElementById('scoreMeterCaption');
   const maxEl = document.getElementById('scoreMeterMax');
-  if(!valEl) return;
+  if (!valEl) return;
   const ceiling = hintUsed ? REDUCED_MAX_PER_Q : MAX_PER_Q;
-  if(maxEl) maxEl.textContent = `points if submitted right now (out of ${ceiling})`;
-  if(!studentText){
+  if (maxEl) maxEl.textContent = `points if submitted right now (out of ${ceiling})`;
+  if (!studentText) {
     valEl.className = 'val tier-none';
     valEl.textContent = '—';
     fillEl.style.width = '0%';
@@ -756,24 +879,24 @@ function updateScoreMeter(studentText){
   const pct = Math.round((points / ceiling) * 100);
   fillEl.style.width = pct + '%';
   let tier, capClass, capText;
-  if(result.similarity >= 0.999){ tier='tier-full'; capClass='full'; capText = hintUsed ? 'exact match — capped by hint use' : 'exact match — full credit'; }
-  else if(result.similarity >= 0.5){ tier='tier-high'; capClass='high'; capText='close — partial credit'; }
-  else if(result.similarity > 0){ tier='tier-mid'; capClass='mid'; capText='some overlap — partial credit'; }
-  else { tier='tier-low'; capClass='low'; capText='not matching yet'; }
+  if (result.similarity >= 0.999) { tier = 'tier-full'; capClass = 'full'; capText = hintUsed ? 'exact match — capped by hint use' : 'exact match — full credit'; }
+  else if (result.similarity >= 0.5) { tier = 'tier-high'; capClass = 'high'; capText = 'close — partial credit'; }
+  else if (result.similarity > 0) { tier = 'tier-mid'; capClass = 'mid'; capText = 'some overlap — partial credit'; }
+  else { tier = 'tier-low'; capClass = 'low'; capText = 'not matching yet'; }
   valEl.className = 'val ' + tier;
   valEl.textContent = points;
   capEl.className = 'caption ' + capClass;
   capEl.textContent = capText;
 }
 
-function resetEditorAndResults(){
+function resetEditorAndResults() {
   document.getElementById('queryInput').value = '';
   document.getElementById('queryInput').disabled = false;
   document.getElementById('resultArea').innerHTML = '<div class="empty-msg">Start typing a query to see live results…</div>';
   document.getElementById('rowCount').style.display = 'none';
   setStatus('idle');
   const fb = document.getElementById('feedbackBox');
-  fb.classList.remove('show','correct','wrong');
+  fb.classList.remove('show', 'correct', 'wrong');
   document.getElementById('submitBtn').disabled = false;
   document.getElementById('hintBtn').disabled = false;
   document.getElementById('queryInput').focus();
@@ -782,26 +905,26 @@ function resetEditorAndResults(){
   updateHighlight(); // clear the highlight layer
 }
 
-function setStatus(state, label){
+function setStatus(state, label) {
   const dot = document.getElementById('statusDot');
   const txt = document.getElementById('statusText');
   const shell = document.querySelector('.editor-shell');
   dot.className = 'status-dot' + (state === 'ok' ? ' ok' : state === 'err' ? ' err' : '');
   txt.textContent = label || (state === 'ok' ? 'valid' : state === 'err' ? 'error' : 'idle');
-  if(shell) shell.classList.toggle('valid', state === 'ok');
+  if (shell) shell.classList.toggle('valid', state === 'ok');
 }
 
 /* ============================= LIVE PREVIEW ============================= */
-function updateSubmitButtonMode(hasText){
+function updateSubmitButtonMode(hasText) {
   const btn = document.getElementById('submitBtn');
-  if(btn.disabled) return; // turn already finished — leave it alone
-  if(currentMode === 'practice'){
+  if (btn.disabled) return; // turn already finished — leave it alone
+  if (currentMode === 'practice') {
     // Practice mode has a dedicated Skip button, so Submit always just submits.
     btn.textContent = 'Submit Answer';
     btn.dataset.mode = 'submit';
     return;
   }
-  if(hasText){
+  if (hasText) {
     btn.textContent = 'Submit Answer';
     btn.dataset.mode = 'submit';
   } else {
@@ -813,13 +936,13 @@ function updateSubmitButtonMode(hasText){
 document.getElementById('tryAgainBtn').addEventListener('click', () => {
   // Practice mode: clear feedback and let user try again
   const fb = document.getElementById('feedbackBox');
-  fb.classList.remove('show','correct','wrong','partial');
+  fb.classList.remove('show', 'correct', 'wrong', 'partial');
   document.getElementById('tryAgainBtn').style.display = 'none';
   document.getElementById('queryInput').focus();
 });
 
 document.getElementById('queryInput').addEventListener('input', () => {
-  if(!timerStarted && currentMode === 'exam'){ timerStarted = true; startTimer(); }
+  if (!timerStarted && currentMode === 'exam') { timerStarted = true; startTimer(); }
   const hasText = document.getElementById('queryInput').value.trim().length > 0;
   updateSubmitButtonMode(hasText);
   updateHighlight();
@@ -828,18 +951,18 @@ document.getElementById('queryInput').addEventListener('input', () => {
 });
 document.getElementById('queryInput').addEventListener('scroll', updateHighlight);
 document.getElementById('queryInput').addEventListener('keydown', (e) => {
-  if((e.ctrlKey || e.metaKey) && e.key === 'Enter'){
+  if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
     e.preventDefault();
-    if(document.getElementById('submitBtn').dataset.mode === 'skip') submitNoAnswer(); else submitAnswer();
+    if (document.getElementById('submitBtn').dataset.mode === 'skip') submitNoAnswer(); else submitAnswer();
   }
 });
 
-function livePreview(){
+function livePreview() {
   const text = document.getElementById('queryInput').value.trim();
   const resultArea = document.getElementById('resultArea');
   const rowCountEl = document.getElementById('rowCount');
   updateScoreMeter(text);
-  if(!text){
+  if (!text) {
     resultArea.innerHTML = '<div class="empty-msg">Start typing a query to see live results…</div>';
     rowCountEl.style.display = 'none';
     setStatus('idle');
@@ -847,7 +970,7 @@ function livePreview(){
   }
   const db = freshDB();
   const run = runSQL(db, text);
-  if(!run.ok){
+  if (!run.ok) {
     resultArea.innerHTML = `<div class="err-msg">⚠ ${escapeHTML(run.error)}</div>`;
     rowCountEl.style.display = 'none';
     setStatus('err');
@@ -856,10 +979,10 @@ function livePreview(){
   }
   let displaySet;
   let isInsertDiff = false;
-  if(currentQ.type === 'dml'){
+  if (currentQ.type === 'dml') {
     const dump = runSQL(db, `SELECT * FROM ${currentQ.table} ORDER BY ${currentQ.pk};`);
     const full = lastResultSet(dump.res);
-    if(currentQ.tags.includes('INSERT') && full){
+    if (currentQ.tags.includes('INSERT') && full) {
       // Show only the row(s) that weren't in the original snapshot — the actual inserted data.
       isInsertDiff = true;
       const pkIdx = full.columns.indexOf(currentQ.pk);
@@ -873,7 +996,7 @@ function livePreview(){
     displaySet = lastResultSet(run.res);
   }
   const label = isInsertDiff ? '<div class="insert-label">newly inserted row(s)</div>' : '';
-  if(!displaySet || displaySet.values.length === 0){
+  if (!displaySet || displaySet.values.length === 0) {
     resultArea.innerHTML = label + `<div class="empty-msg">${isInsertDiff ? 'No new row detected yet.' : 'Statement executed — no rows returned. (Did the question ask for a SELECT?)'}</div>`;
     rowCountEl.style.display = 'none';
   } else {
@@ -885,50 +1008,50 @@ function livePreview(){
   db.close();
 }
 
-function escapeHTML(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escapeHTML(s) { return String(s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
 /* ============================= SQL SYNTAX HIGHLIGHTER ============================= */
 const SQL_KEYWORDS = new Set([
-  'SELECT','FROM','WHERE','INSERT','INTO','VALUES','UPDATE','SET',
-  'DELETE','JOIN','LEFT','RIGHT','INNER','OUTER','FULL','CROSS',
-  'ON','AS','AND','OR','NOT','IN','LIKE','BETWEEN','IS','NULL',
-  'GROUP','BY','ORDER','HAVING','LIMIT','OFFSET','DISTINCT','ALL',
-  'CASE','WHEN','THEN','ELSE','END','EXISTS','UNION','INTERSECT',
-  'EXCEPT','CREATE','TABLE','DROP','ALTER','ADD','COLUMN','PRIMARY',
-  'KEY','FOREIGN','REFERENCES','INDEX','CONSTRAINT','DEFAULT',
-  'UNIQUE','CHECK','ASC','DESC','WITH','RECURSIVE'
+  'SELECT', 'FROM', 'WHERE', 'INSERT', 'INTO', 'VALUES', 'UPDATE', 'SET',
+  'DELETE', 'JOIN', 'LEFT', 'RIGHT', 'INNER', 'OUTER', 'FULL', 'CROSS',
+  'ON', 'AS', 'AND', 'OR', 'NOT', 'IN', 'LIKE', 'BETWEEN', 'IS', 'NULL',
+  'GROUP', 'BY', 'ORDER', 'HAVING', 'LIMIT', 'OFFSET', 'DISTINCT', 'ALL',
+  'CASE', 'WHEN', 'THEN', 'ELSE', 'END', 'EXISTS', 'UNION', 'INTERSECT',
+  'EXCEPT', 'CREATE', 'TABLE', 'DROP', 'ALTER', 'ADD', 'COLUMN', 'PRIMARY',
+  'KEY', 'FOREIGN', 'REFERENCES', 'INDEX', 'CONSTRAINT', 'DEFAULT',
+  'UNIQUE', 'CHECK', 'ASC', 'DESC', 'WITH', 'RECURSIVE'
 ]);
 const SQL_FUNCTIONS = new Set([
-  'COUNT','SUM','AVG','MIN','MAX','COALESCE','NULLIF','IFNULL',
-  'CAST','TYPEOF','LENGTH','SUBSTR','SUBSTRING','UPPER','LOWER',
-  'TRIM','LTRIM','RTRIM','REPLACE','INSTR','ROUND','ABS','CEIL',
-  'FLOOR','MOD','DATE','TIME','DATETIME','STRFTIME','NOW','ISNULL'
+  'COUNT', 'SUM', 'AVG', 'MIN', 'MAX', 'COALESCE', 'NULLIF', 'IFNULL',
+  'CAST', 'TYPEOF', 'LENGTH', 'SUBSTR', 'SUBSTRING', 'UPPER', 'LOWER',
+  'TRIM', 'LTRIM', 'RTRIM', 'REPLACE', 'INSTR', 'ROUND', 'ABS', 'CEIL',
+  'FLOOR', 'MOD', 'DATE', 'TIME', 'DATETIME', 'STRFTIME', 'NOW', 'ISNULL'
 ]);
 
-function highlightSQL(text){
-  if(!text) return '';
+function highlightSQL(text) {
+  if (!text) return '';
   const TOKEN = /(--.*)|(\/\*[\s\S]*?\*\/)|('(?:''|[^'])*')|("(?:""|[^"])*")|((?:\d+\.?\d*)|(?:\.\d+))|([a-zA-Z_]\w*)|([*\/+\-<>=!%&|^~,;.()\[\]{}?:])|([ \t\r\n]+)/g;
   let out = '';
   let m;
   TOKEN.lastIndex = 0;
-  while((m = TOKEN.exec(text)) !== null){
+  while ((m = TOKEN.exec(text)) !== null) {
     const [full, lineComment, blockComment, singleStr, dblStr, num, ident, op, ws] = m;
-    if(lineComment || blockComment){
+    if (lineComment || blockComment) {
       out += `<span style="color:var(--text-faint)">${escapeHTML(full)}</span>`;
-    } else if(singleStr || dblStr){
+    } else if (singleStr || dblStr) {
       out += `<span style="color:var(--amber)">${escapeHTML(full)}</span>`;
-    } else if(num){
+    } else if (num) {
       out += `<span style="color:var(--green)">${escapeHTML(full)}</span>`;
-    } else if(ident){
+    } else if (ident) {
       const upper = full.toUpperCase();
-      if(SQL_KEYWORDS.has(upper)){
+      if (SQL_KEYWORDS.has(upper)) {
         out += `<span style="color:var(--cyan);font-weight:600">${escapeHTML(full)}</span>`;
-      } else if(SQL_FUNCTIONS.has(upper)){
+      } else if (SQL_FUNCTIONS.has(upper)) {
         out += `<span style="color:var(--violet)">${escapeHTML(full)}</span>`;
       } else {
         out += `<span style="color:var(--text)">${escapeHTML(full)}</span>`;
       }
-    } else if(op){
+    } else if (op) {
       out += `<span style="color:var(--text-dim)">${escapeHTML(full)}</span>`;
     } else {
       out += escapeHTML(full);
@@ -937,10 +1060,10 @@ function highlightSQL(text){
   return out;
 }
 
-function updateHighlight(){
+function updateHighlight() {
   const ta = document.getElementById('queryInput');
   const hl = document.getElementById('sqlHighlight');
-  if(!ta || !hl) return;
+  if (!ta || !hl) return;
   hl.innerHTML = highlightSQL(ta.value) || '';
   hl.scrollTop = ta.scrollTop;
 }
@@ -950,22 +1073,22 @@ function updateHighlight(){
 // Row-set similarity for SELECT/JOIN/GROUP BY questions: counts how many expected
 // rows appear in the student's result (as a multiset), penalizing both missing
 // and extra rows. Returns a value in [0,1].
-function rowSimilarity(expectedRows, actualRows, orderMatters){
-  if(expectedRows.length === 0 && actualRows.length === 0) return 1;
+function rowSimilarity(expectedRows, actualRows, orderMatters) {
+  if (expectedRows.length === 0 && actualRows.length === 0) return 1;
   const expStrs = expectedRows.map(r => JSON.stringify(r));
   const actStrs = actualRows.map(r => JSON.stringify(r));
   const remaining = {};
   expStrs.forEach(s => { remaining[s] = (remaining[s] || 0) + 1; });
   let matched = 0;
   actStrs.forEach(s => {
-    if(remaining[s] > 0){ matched++; remaining[s]--; }
+    if (remaining[s] > 0) { matched++; remaining[s]--; }
   });
   const denom = Math.max(expStrs.length, actStrs.length, 1);
   let sim = matched / denom;
 
-  if(orderMatters && matched === expStrs.length && actStrs.length === expStrs.length){
+  if (orderMatters && matched === expStrs.length && actStrs.length === expStrs.length) {
     let orderMatches = 0;
-    for(let i = 0; i < expStrs.length; i++){ if(expStrs[i] === actStrs[i]) orderMatches++; }
+    for (let i = 0; i < expStrs.length; i++) { if (expStrs[i] === actStrs[i]) orderMatches++; }
     const orderScore = expStrs.length ? orderMatches / expStrs.length : 1;
     sim = 0.7 * sim + 0.3 * orderScore;
   }
@@ -975,7 +1098,7 @@ function rowSimilarity(expectedRows, actualRows, orderMatters){
 // Cell-level similarity for INSERT/UPDATE/DELETE: for every row that the canonical
 // query was supposed to touch (added, changed, or removed), checks how many of the
 // student's cell values match — so a near-right UPDATE still earns partial credit.
-function tableSimilarity(originalRows, canonicalRows, studentRows, pkIdx){
+function tableSimilarity(originalRows, canonicalRows, studentRows, pkIdx) {
   const origByPk = new Map(originalRows.map(r => [r[pkIdx], r]));
   const canonByPk = new Map(canonicalRows.map(r => [r[pkIdx], r]));
   const studByPk = new Map(studentRows.map(r => [r[pkIdx], r]));
@@ -985,13 +1108,13 @@ function tableSimilarity(originalRows, canonicalRows, studentRows, pkIdx){
   allPks.forEach(pk => {
     const canon = canonByPk.get(pk);
     const stud = studByPk.get(pk);
-    if(canon === undefined){
+    if (canon === undefined) {
       // this row should no longer exist (deleted, or never existed)
       totalCells += 1;
-      if(stud === undefined) matchedCells += 1;
+      if (stud === undefined) matchedCells += 1;
       return;
     }
-    if(stud === undefined){
+    if (stud === undefined) {
       totalCells += canon.length; // row entirely missing when it should exist
       return;
     }
@@ -999,27 +1122,27 @@ function tableSimilarity(originalRows, canonicalRows, studentRows, pkIdx){
     canon.forEach((val, i) => {
       const nv = typeof val === 'number' ? Math.round(val * 100) / 100 : val;
       const sv = typeof stud[i] === 'number' ? Math.round(stud[i] * 100) / 100 : stud[i];
-      if(nv === sv) matchedCells++;
+      if (nv === sv) matchedCells++;
     });
   });
   return totalCells === 0 ? 1 : matchedCells / totalCells;
 }
 
 /* ============================= GRADING ============================= */
-function gradeAnswer(studentSQLText){
+function gradeAnswer(studentSQLText) {
   const dbA = freshDB(); // canonical
   const dbB = freshDB(); // student
 
   const canonicalRun = runSQL(dbA, currentQ.sql);
   const studentRun = runSQL(dbB, studentSQLText);
 
-  if(!studentRun.ok){
+  if (!studentRun.ok) {
     dbA.close(); dbB.close();
-    return { correct:false, similarity:0, reason: studentRun.error };
+    return { correct: false, similarity: 0, reason: studentRun.error };
   }
 
   let similarity;
-  if(currentQ.type === 'select'){
+  if (currentQ.type === 'select') {
     const expected = normalizeRows(lastResultSet(canonicalRun.res));
     const actual = normalizeRows(lastResultSet(studentRun.res));
     similarity = rowSimilarity(expected, actual, currentQ.orderMatters);
@@ -1045,10 +1168,10 @@ function gradeAnswer(studentSQLText){
 /* ============================= SUBMIT / SKIP / HINT ============================= */
 document.getElementById('submitBtn').addEventListener('click', () => {
   const mode = document.getElementById('submitBtn').dataset.mode;
-  if(mode === 'skip') submitNoAnswer(); else submitAnswer();
+  if (mode === 'skip') submitNoAnswer(); else submitAnswer();
 });
 document.getElementById('skipBtn').addEventListener('click', () => {
-  if(turnSubmitted) return;
+  if (turnSubmitted) return;
   submitNoAnswer(); // practice mode: skip straight to the next question, no penalty
 });
 document.getElementById('clearBtn').addEventListener('click', () => {
@@ -1061,15 +1184,15 @@ document.getElementById('hintBtn').addEventListener('click', () => {
   const willShow = !el.classList.contains('show');
   el.classList.toggle('show');
   document.getElementById('hintBtn').textContent = el.classList.contains('show') ? '💡 hide hint' : '💡 show hint';
-  if(willShow) hintUsed = true; // using the hint caps this question's score, whether revealed manually or by the timer
+  if (willShow) hintUsed = true; // using the hint caps this question's score, whether revealed manually or by the timer
   livePreview();
 });
 
 
-function submitAnswer(){
-  if(turnSubmitted) return;
+function submitAnswer() {
+  if (turnSubmitted) return;
   const text = document.getElementById('queryInput').value.trim();
-  if(!text){ submitNoAnswer(); return; }
+  if (!text) { submitNoAnswer(); return; }
 
   const fb = document.getElementById('feedbackBox');
   const main = document.getElementById('feedbackMain');
@@ -1079,11 +1202,11 @@ function submitAnswer(){
   const result = gradeAnswer(text);
 
   /* ---- PRACTICE MODE ---- */
-  if(currentMode === 'practice'){
+  if (currentMode === 'practice') {
     practiceAttempts++;
-    if(result.similarity >= 0.999){
+    if (result.similarity >= 0.999) {
       fb.className = 'feedback show correct';
-      main.textContent = `✔ Correct! Perfect SQL in ${practiceAttempts} attempt${practiceAttempts===1?'':'s'}.`;
+      main.textContent = `✔ Correct! Perfect SQL in ${practiceAttempts} attempt${practiceAttempts === 1 ? '' : 's'}.`;
       sub.textContent = 'Great work! You can try a new question or practice another.';
       actions.innerHTML = '';
       const nextQ = document.createElement('button');
@@ -1091,7 +1214,7 @@ function submitAnswer(){
       nextQ.textContent = '→ Next Question';
       nextQ.onclick = () => {
         pool.length === 0 ? showBankExhausted() : beginStudentTurn();
-        fb.classList.remove('show','correct','wrong','partial');
+        fb.classList.remove('show', 'correct', 'wrong', 'partial');
         document.getElementById('tryAgainBtn').style.display = 'none';
       };
       actions.appendChild(nextQ);
@@ -1106,14 +1229,14 @@ function submitAnswer(){
       document.getElementById('submitBtn').disabled = true;
     } else {
       // Wrong/partial in practice → show feedback but allow retry
-      if(result.similarity > 0){
+      if (result.similarity > 0) {
         fb.className = 'feedback show partial';
         main.textContent = `◐ Partially correct — attempt ${practiceAttempts}`;
-        sub.textContent = `Your result is about ${Math.round(result.similarity*100)}% of the way there. Keep trying!`;
+        sub.textContent = `Your result is about ${Math.round(result.similarity * 100)}% of the way there. Keep trying!`;
       } else {
         fb.className = 'feedback show wrong';
         main.textContent = `✘ Not matching yet — attempt ${practiceAttempts}`;
-        sub.textContent = result.reason ? (result.reason.length > 140 ? result.reason.slice(0,140) + '…' : result.reason) : 'Result does not match the expected outcome. Try again!';
+        sub.textContent = result.reason ? (result.reason.length > 140 ? result.reason.slice(0, 140) + '…' : result.reason) : 'Result does not match the expected outcome. Try again!';
       }
       actions.innerHTML = '';
       // Let the student move on even without getting it right.
@@ -1122,7 +1245,7 @@ function submitAnswer(){
       nextAnyway.textContent = '→ Next Question';
       nextAnyway.onclick = () => {
         pool.length === 0 ? showBankExhausted() : beginStudentTurn();
-        fb.classList.remove('show','correct','wrong','partial');
+        fb.classList.remove('show', 'correct', 'wrong', 'partial');
         document.getElementById('tryAgainBtn').style.display = 'none';
       };
       actions.appendChild(nextAnyway);
@@ -1142,20 +1265,20 @@ function submitAnswer(){
   lastScore = points;
   addToLeaderboard(studentName, points, MAX_PER_Q, currentQ);
 
-  if(result.similarity >= 0.999){
+  if (result.similarity >= 0.999) {
     fb.className = 'feedback show correct';
     main.textContent = `✔ Correct! +${points} pts`;
     sub.textContent = hintUsed
       ? `Hint was used, so this is capped at a maximum of ${REDUCED_MAX_PER_Q}/${MAX_PER_Q} (${points}/${MAX_PER_Q}).`
       : `Exact match — full credit (${points}/${MAX_PER_Q}).`;
-  } else if(result.similarity > 0){
+  } else if (result.similarity > 0) {
     fb.className = 'feedback show partial';
     main.textContent = `◐ Partially correct — +${points} pts`;
-    sub.textContent = `Your result is about ${Math.round(result.similarity*100)}% of the way there (max for this attempt was ${ceiling}/${MAX_PER_Q}).`;
+    sub.textContent = `Your result is about ${Math.round(result.similarity * 100)}% of the way there (max for this attempt was ${ceiling}/${MAX_PER_Q}).`;
   } else {
     fb.className = 'feedback show wrong';
-    main.textContent = `✘ Not matching — +${points} pt${points===1?'':'s'}`;
-    sub.textContent = result.reason ? (result.reason.length > 140 ? result.reason.slice(0,140) + '…' : result.reason) : 'Result does not match the expected outcome.';
+    main.textContent = `✘ Not matching — +${points} pt${points === 1 ? '' : 's'}`;
+    sub.textContent = result.reason ? (result.reason.length > 140 ? result.reason.slice(0, 140) + '…' : result.reason) : 'Result does not match the expected outcome.';
   }
 
   actions.innerHTML = '';
@@ -1174,11 +1297,11 @@ function submitAnswer(){
   updateHud();
 }
 
-function submitNoAnswer(){
-  if(turnSubmitted) return;
-  if(currentMode === 'practice'){
+function submitNoAnswer() {
+  if (turnSubmitted) return;
+  if (currentMode === 'practice') {
     // In practice mode, skip means go to next question (same student)
-    if(pool.length === 0){ showBankExhausted(); return; }
+    if (pool.length === 0) { showBankExhausted(); return; }
     beginStudentTurn();
     return;
   }
@@ -1191,7 +1314,7 @@ function submitNoAnswer(){
 }
 
 /* ============================= HUD / SCORE ============================= */
-function updateHud(){
+function updateHud() {
   const used = QUESTIONS.length - pool.length;
   document.getElementById('progressLabel').textContent = `${used} / ${QUESTIONS.length}`;
   document.getElementById('progressFill').style.width = `${(used / QUESTIONS.length) * 100}%`;
