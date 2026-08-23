@@ -245,6 +245,14 @@ const LEADERBOARD_KEY = 'sqlPracticalExam_leaderboard_v2';
 let currentMode = 'practice'; // 'practice' | 'exam'
 let practiceAttempts = 0; // number of attempts made in practice mode for current question
 let selectedDifficulty = 'all'; // practice-mode filter; exam mode always uses all questions
+let turnStartTime = 0;
+let currentKeystrokeHistory = [];
+let leaderboardSearchQuery = '';
+let replayActiveEntry = null;
+let replayIndex = 0;
+let replayTimer = null;
+let isReplaying = false;
+let replaySpeed = 2;
 
 
 /* ============================= INIT ============================= */
@@ -409,6 +417,8 @@ function beginStudentTurn() {
   timerStarted = false;
   turnSubmitted = false;
   practiceAttempts = 0;
+  turnStartTime = Date.now();
+  currentKeystrokeHistory = [{ t: 0, val: '' }];
 
   // Update mode UI
   document.getElementById('modeLabel').textContent = currentMode === 'practice' ? 'Practice' : 'Exam';
@@ -619,12 +629,19 @@ function saveLeaderboard() {
 }
 
 function addToLeaderboard(name, score, maxScore, question) {
+  const text = document.getElementById('queryInput')?.value || '';
+  if (currentKeystrokeHistory.length <= 1 && text) {
+    currentKeystrokeHistory.push({ t: 1000, val: text });
+  }
   const entry = {
     name,
     score,
     maxScore,
     pct: Math.round((score / maxScore) * 1000) / 10,
     topic: question ? question.tags.join(', ') : '—',
+    questionText: question ? question.text : '',
+    submittedQuery: text,
+    history: currentKeystrokeHistory.slice(),
     date: new Date().toLocaleString()
   };
 
@@ -643,25 +660,58 @@ function renderLeaderboard() {
   const modalArea = document.getElementById('modalLeaderboardArea');
   const modalCountEl = document.getElementById('modalLeaderboardCount');
 
-  const countText = `${leaderboard.length} ${leaderboard.length === 1 ? 'entry' : 'entries'}`;
+  const q = leaderboardSearchQuery.trim().toLowerCase();
+  const sorted = leaderboard.slice().sort((a, b) => b.score - a.score);
+  const filtered = q
+    ? sorted.filter(e =>
+        (e.name && e.name.toLowerCase().includes(q)) ||
+        (e.topic && e.topic.toLowerCase().includes(q)) ||
+        (e.questionText && e.questionText.toLowerCase().includes(q))
+      )
+    : sorted;
+
+  const countText = q
+    ? `${filtered.length} of ${leaderboard.length} entries`
+    : `${leaderboard.length} ${leaderboard.length === 1 ? 'entry' : 'entries'}`;
+
   if (countEl) countEl.textContent = countText;
   if (modalCountEl) modalCountEl.textContent = countText;
 
-  if (leaderboard.length === 0) {
-    const emptyHTML = '<div class="empty-msg">No one has finished the exam yet — scores will appear here as students complete it.</div>';
+  if (filtered.length === 0) {
+    const emptyHTML = leaderboard.length === 0
+      ? '<div class="empty-msg">No one has finished the exam yet — scores will appear here as students complete it.</div>'
+      : `<div class="empty-msg">No entries match "${escapeHTML(leaderboardSearchQuery)}".</div>`;
     if (area) area.innerHTML = emptyHTML;
     if (modalArea) modalArea.innerHTML = emptyHTML;
     return;
   }
-  const sorted = leaderboard.slice().sort((a, b) => b.score - a.score);
   let h = '<table><thead><tr><th>#</th><th>name</th><th>question</th><th>score</th><th>%</th><th>completed</th></tr></thead><tbody>';
-  sorted.forEach((entry, i) => {
-    h += `<tr><td>${i + 1}</td><td>${escapeHTML(entry.name)}</td><td>${escapeHTML(entry.topic || '—')}</td><td>${entry.score} / ${entry.maxScore}</td><td>${entry.pct}%</td><td>${escapeHTML(entry.date)}</td></tr>`;
+  filtered.forEach((entry, i) => {
+    const origIdx = leaderboard.indexOf(entry);
+    const hasHistory = entry.history && entry.history.length > 0;
+    const nameCell = hasHistory
+      ? `<a class="student-replay-link" onclick="openReplayModal(${origIdx})" title="Click to replay student typing">🎬 ${escapeHTML(entry.name)}</a>`
+      : escapeHTML(entry.name);
+    h += `<tr><td>${i + 1}</td><td>${nameCell}</td><td>${escapeHTML(entry.topic || '—')}</td><td>${entry.score} / ${entry.maxScore}</td><td>${entry.pct}%</td><td>${escapeHTML(entry.date)}</td></tr>`;
   });
   h += '</tbody></table>';
   if (area) area.innerHTML = h;
   if (modalArea) modalArea.innerHTML = h;
 }
+
+document.getElementById('leaderboardSearchInput')?.addEventListener('input', (e) => {
+  leaderboardSearchQuery = e.target.value;
+  const modalInput = document.getElementById('modalLeaderboardSearchInput');
+  if (modalInput && modalInput.value !== e.target.value) modalInput.value = e.target.value;
+  renderLeaderboard();
+});
+
+document.getElementById('modalLeaderboardSearchInput')?.addEventListener('input', (e) => {
+  leaderboardSearchQuery = e.target.value;
+  const mainInput = document.getElementById('leaderboardSearchInput');
+  if (mainInput && mainInput.value !== e.target.value) mainInput.value = e.target.value;
+  renderLeaderboard();
+});
 
 const CLEAR_LEADERBOARD_PASSWORD = "iamatomic";
 
@@ -700,6 +750,154 @@ document.getElementById('modalLeaderboardBtn')?.addEventListener('click', openLe
 document.getElementById('nextStudentLeaderboardBtn')?.addEventListener('click', openLeaderboardModal);
 document.getElementById('closeLeaderboardModalBtn')?.addEventListener('click', closeLeaderboardModal);
 document.getElementById('modalLeaderboardCloseBtn')?.addEventListener('click', closeLeaderboardModal);
+
+/* ============================= REPLAY PLAYBACK ENGINE ============================= */
+function openReplayModal(idx) {
+  if (idx < 0 || idx >= leaderboard.length) return;
+  replayActiveEntry = leaderboard[idx];
+  if (!replayActiveEntry.history || replayActiveEntry.history.length === 0) {
+    replayActiveEntry.history = [
+      { t: 0, val: '' },
+      { t: 1500, val: replayActiveEntry.submittedQuery || '' }
+    ];
+  }
+
+  document.getElementById('replayStudentName').textContent = replayActiveEntry.name;
+  document.getElementById('replayScore').textContent = `${replayActiveEntry.score} / ${replayActiveEntry.maxScore}`;
+  document.getElementById('replayQuestionTopic').textContent = replayActiveEntry.topic;
+  document.getElementById('replayQuestionText').textContent = replayActiveEntry.questionText || 'SQL Question Replay';
+
+  replayIndex = 0;
+  pauseReplay();
+
+  document.getElementById('replayModalOverlay').classList.add('show');
+  renderReplayFrame(0);
+  playReplay();
+}
+
+function closeReplayModal() {
+  pauseReplay();
+  document.getElementById('replayModalOverlay').classList.remove('show');
+}
+
+function renderReplayFrame(index) {
+  if (!replayActiveEntry || !replayActiveEntry.history) return;
+  const history = replayActiveEntry.history;
+  if (index < 0) index = 0;
+  if (index >= history.length) index = history.length - 1;
+  replayIndex = index;
+
+  const currentStep = history[index];
+  const prevStep = index > 0 ? history[index - 1] : { val: '' };
+
+  const codeEl = document.getElementById('replayCodeHighlight');
+  const badgeEl = document.getElementById('replayActionBadge');
+  const timeEl = document.getElementById('replayTimeDisplay');
+  const scrubberEl = document.getElementById('replayScrubber');
+
+  codeEl.innerHTML = highlightSQL(currentStep.val) || '';
+
+  if (index === 0) {
+    badgeEl.textContent = 'START';
+    badgeEl.style.color = 'var(--cyan)';
+  } else if (index === history.length - 1) {
+    badgeEl.textContent = 'SUBMITTED';
+    badgeEl.style.color = 'var(--green)';
+  } else if (currentStep.val.length < prevStep.val.length) {
+    badgeEl.textContent = 'ERASING';
+    badgeEl.style.color = 'var(--red)';
+  } else if (currentStep.val === '') {
+    badgeEl.textContent = 'CLEARED';
+    badgeEl.style.color = 'var(--amber)';
+  } else {
+    badgeEl.textContent = 'TYPING';
+    badgeEl.style.color = 'var(--green)';
+  }
+
+  const maxTime = history[history.length - 1].t || 1000;
+  const curTime = currentStep.t || 0;
+  const pct = maxTime > 0 ? Math.round((curTime / maxTime) * 100) : 100;
+
+  scrubberEl.value = pct;
+
+  const formatSec = (ms) => {
+    const s = Math.floor(ms / 1000);
+    const m = Math.floor(s / 60);
+    const sec = s % 60;
+    return `${m}:${String(sec).padStart(2, '0')}`;
+  };
+  timeEl.textContent = `${formatSec(curTime)} / ${formatSec(maxTime)}`;
+}
+
+function playReplay() {
+  pauseReplay();
+  if (!replayActiveEntry || !replayActiveEntry.history) return;
+  isReplaying = true;
+  document.getElementById('replayPlayBtn').textContent = '❚❚ Pause';
+
+  const history = replayActiveEntry.history;
+  if (replayIndex >= history.length - 1) {
+    replayIndex = 0;
+  }
+
+  const step = () => {
+    if (!isReplaying) return;
+    if (replayIndex >= history.length - 1) {
+      pauseReplay();
+      return;
+    }
+
+    const cur = history[replayIndex];
+    const next = history[replayIndex + 1];
+    replayIndex++;
+    renderReplayFrame(replayIndex);
+
+    let delay = (next.t - cur.t) / replaySpeed;
+    if (delay < 50) delay = 50;
+    if (delay > 1500) delay = 1500;
+
+    replayTimer = setTimeout(step, delay);
+  };
+
+  step();
+}
+
+function pauseReplay() {
+  isReplaying = false;
+  if (replayTimer) { clearTimeout(replayTimer); replayTimer = null; }
+  const btn = document.getElementById('replayPlayBtn');
+  if (btn) btn.textContent = '▶ Play';
+}
+
+document.getElementById('replayPlayBtn')?.addEventListener('click', () => {
+  if (isReplaying) pauseReplay(); else playReplay();
+});
+
+document.getElementById('replayResetBtn')?.addEventListener('click', () => {
+  pauseReplay();
+  renderReplayFrame(0);
+});
+
+document.getElementById('replaySpeedSelect')?.addEventListener('change', (e) => {
+  replaySpeed = parseFloat(e.target.value) || 2;
+});
+
+document.getElementById('replayScrubber')?.addEventListener('input', (e) => {
+  pauseReplay();
+  if (!replayActiveEntry || !replayActiveEntry.history) return;
+  const pct = parseFloat(e.target.value) / 100;
+  const history = replayActiveEntry.history;
+  const maxTime = history[history.length - 1].t || 1;
+  const targetTime = pct * maxTime;
+
+  let closestIdx = 0;
+  for (let i = 0; i < history.length; i++) {
+    if (history[i].t <= targetTime) closestIdx = i;
+  }
+  renderReplayFrame(closestIdx);
+});
+
+document.getElementById('closeReplayModalBtn')?.addEventListener('click', closeReplayModal);
 
 /* ============================= REFERENCE TABLES ============================= */
 function renderReferenceTables(db) {
@@ -943,6 +1141,12 @@ document.getElementById('tryAgainBtn').addEventListener('click', () => {
 
 document.getElementById('queryInput').addEventListener('input', () => {
   if (!timerStarted && currentMode === 'exam') { timerStarted = true; startTimer(); }
+  if (turnStartTime > 0 && !turnSubmitted) {
+    currentKeystrokeHistory.push({
+      t: Date.now() - turnStartTime,
+      val: document.getElementById('queryInput').value
+    });
+  }
   const hasText = document.getElementById('queryInput').value.trim().length > 0;
   updateSubmitButtonMode(hasText);
   updateHighlight();
@@ -1176,6 +1380,12 @@ document.getElementById('skipBtn').addEventListener('click', () => {
 });
 document.getElementById('clearBtn').addEventListener('click', () => {
   document.getElementById('queryInput').value = '';
+  if (turnStartTime > 0 && !turnSubmitted) {
+    currentKeystrokeHistory.push({
+      t: Date.now() - turnStartTime,
+      val: ''
+    });
+  }
   updateSubmitButtonMode(false);
   livePreview();
 });

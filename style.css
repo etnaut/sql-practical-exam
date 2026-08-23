@@ -339,3 +339,24 @@
 @media (max-width:560px){
   .setup-actions{flex-direction:column;}
 }
+
+.student-replay-link {
+  color: var(--cyan);
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-style: dotted;
+  transition: color .15s ease;
+}
+.student-replay-link:hover {
+  color: var(--green);
+  text-decoration-style: solid;
+}
+.replay-cursor {
+  color: var(--cyan);
+  font-weight: 700;
+  animation: blink 1s infinite;
+}
+@keyframes blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
