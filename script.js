@@ -254,6 +254,171 @@ let replayTimer = null;
 let isReplaying = false;
 let replaySpeed = 2;
 
+/* ============================= EXAM MODE SCHEDULE & AUTHORIZATION ============================= */
+const SCHEDULE_KEY = 'sqlPracticalExam_schedule_v1';
+const TEACHER_PASSWORD = "iamatomic";
+
+let examSchedule = {
+  enabled: false,
+  startISO: '',
+  endISO: ''
+};
+
+function loadExamSchedule() {
+  try {
+    const raw = localStorage.getItem(SCHEDULE_KEY);
+    if (raw) examSchedule = JSON.parse(raw);
+  } catch (e) {
+    examSchedule = { enabled: false, startISO: '', endISO: '' };
+  }
+}
+
+function saveExamSchedule() {
+  try {
+    localStorage.setItem(SCHEDULE_KEY, JSON.stringify(examSchedule));
+  } catch (e) { /* ignore storage error */ }
+  updateScheduleUI();
+}
+
+function checkExamAvailability() {
+  if (!examSchedule || !examSchedule.enabled) {
+    return { available: false, status: 'no_schedule', message: '🔒 Exam Mode is currently closed. A teacher must set an Exam Schedule to open it.' };
+  }
+  const now = Date.now();
+  const startTime = examSchedule.startISO ? new Date(examSchedule.startISO).getTime() : 0;
+  const endTime = examSchedule.endISO ? new Date(examSchedule.endISO).getTime() : Infinity;
+
+  if (startTime && now < startTime) {
+    const startStr = new Date(examSchedule.startISO).toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    return { available: false, status: 'scheduled', message: `🔒 Exam Mode is locked. Scheduled to open on ${startStr}` };
+  }
+  if (endTime && now > endTime) {
+    const endStr = new Date(examSchedule.endISO).toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    return { available: false, status: 'closed', message: `🔒 Exam Mode is closed. The exam ended on ${endStr}` };
+  }
+  return { available: true, status: 'open', message: '🟢 Exam Mode is currently active' };
+}
+
+function updateScheduleUI() {
+  const avail = checkExamAvailability();
+  const noticeEl = document.getElementById('examScheduleNotice');
+  const cardExam = document.getElementById('modeCardExam');
+  const errEl = document.getElementById('nameError');
+  const startBtn = document.getElementById('startExamBtn');
+  const nameInput = document.getElementById('studentNameInput');
+
+  if (noticeEl) {
+    if (!avail.available) {
+      noticeEl.textContent = avail.message;
+      noticeEl.style.display = 'block';
+    } else if (examSchedule && examSchedule.enabled) {
+      noticeEl.textContent = '🟢 Exam Schedule Active';
+      noticeEl.style.display = 'block';
+    } else {
+      noticeEl.style.display = 'none';
+    }
+  }
+
+  if (cardExam) {
+    cardExam.classList.toggle('disabled', !avail.available);
+  }
+
+  if (currentMode === 'exam' && !avail.available) {
+    if (errEl) {
+      errEl.textContent = avail.message;
+      errEl.style.display = 'block';
+    }
+    if (startBtn) startBtn.disabled = true;
+    if (nameInput) nameInput.disabled = true;
+  }
+}
+
+function promptExamScheduleSettings() {
+  const pass = prompt('Enter teacher password to configure Exam Schedule:');
+  if (pass === null) return;
+  if (pass.trim() === TEACHER_PASSWORD) {
+    openScheduleModal();
+  } else {
+    alert('Incorrect password! Teacher authorization required.');
+  }
+}
+
+function openScheduleModal() {
+  const modal = document.getElementById('examScheduleModalOverlay');
+  const chk = document.getElementById('scheduleEnableCheckbox');
+  const startInp = document.getElementById('scheduleStartInput');
+  const endInp = document.getElementById('scheduleEndInput');
+  const fieldsWrap = document.getElementById('scheduleFieldsWrap');
+  const statusEl = document.getElementById('scheduleModalStatus');
+
+  if (!modal) return;
+
+  chk.checked = !!examSchedule.enabled;
+  startInp.value = examSchedule.startISO || '';
+  endInp.value = examSchedule.endISO || '';
+
+  const updateFieldsState = () => {
+    if (fieldsWrap) {
+      fieldsWrap.style.opacity = chk.checked ? '1' : '0.5';
+      fieldsWrap.style.pointerEvents = chk.checked ? 'auto' : 'none';
+    }
+  };
+  updateFieldsState();
+
+  chk.onchange = updateFieldsState;
+
+  if (statusEl) {
+    const avail = checkExamAvailability();
+    if (examSchedule.enabled) {
+      statusEl.textContent = avail.available ? 'Status: 🟢 Exam is Open' : `Status: ${avail.message}`;
+      statusEl.style.color = avail.available ? 'var(--green)' : 'var(--amber)';
+      statusEl.style.display = 'block';
+    } else {
+      statusEl.style.display = 'none';
+    }
+  }
+
+  modal.classList.add('show');
+}
+
+function closeScheduleModal() {
+  document.getElementById('examScheduleModalOverlay')?.classList.remove('show');
+}
+
+function saveScheduleFromModal() {
+  const chk = document.getElementById('scheduleEnableCheckbox');
+  const startInp = document.getElementById('scheduleStartInput');
+  const endInp = document.getElementById('scheduleEndInput');
+
+  if (chk.checked) {
+    if (!startInp.value && !endInp.value) {
+      alert('Please specify at least a Start Date/Time or End Date/Time.');
+      return;
+    }
+    if (startInp.value && endInp.value && new Date(startInp.value) >= new Date(endInp.value)) {
+      alert('Start Date & Time must be earlier than End Date & Time.');
+      return;
+    }
+  }
+
+  examSchedule = {
+    enabled: chk.checked,
+    startISO: startInp.value || '',
+    endISO: endInp.value || ''
+  };
+
+  saveExamSchedule();
+  closeScheduleModal();
+  alert('Exam schedule updated successfully!');
+}
+
+function clearScheduleFromModal() {
+  examSchedule = { enabled: false, startISO: '', endISO: '' };
+  saveExamSchedule();
+  closeScheduleModal();
+  alert('Exam schedule cleared.');
+}
+
 
 /* ============================= INIT ============================= */
 initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.2.1/dist/${f}` })
@@ -273,8 +438,10 @@ initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.2.
     };
     db.close();
     pool = QUESTIONS.map(q => q.id); // question bank for the whole session — shared across every student
+    loadExamSchedule();
     loadLeaderboard();
     renderLeaderboard();
+    updateScheduleUI();
     updateHud();
     unlockNameModal();
   })
@@ -286,6 +453,7 @@ initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.2.
 
 function selectMode(mode) {
   currentMode = mode;
+  const avail = checkExamAvailability();
 
   // Toggle visual selection state on mode cards
   document.getElementById('modeCardPractice')?.classList.toggle('selected', mode === 'practice');
@@ -295,6 +463,16 @@ function selectMode(mode) {
   const nameWrap = document.getElementById('nameFieldWrap');
   const difficultyWrap = document.getElementById('difficultyWrap');
   const startBtn = document.getElementById('startExamBtn');
+  const errEl = document.getElementById('nameError');
+
+  if (!avail.available && mode === 'exam') {
+    if (errEl) {
+      errEl.textContent = avail.message;
+      errEl.style.display = 'block';
+    }
+  } else if (errEl) {
+    errEl.style.display = 'none';
+  }
 
   if (sub) {
     sub.textContent = mode === 'practice'
@@ -308,17 +486,18 @@ function selectMode(mode) {
   // Practice mode does not require a name; Exam mode does.
   if (nameWrap) nameWrap.style.display = mode === 'practice' ? 'none' : 'block';
   if (startBtn) {
-    startBtn.disabled = false;
+    startBtn.disabled = mode === 'exam' && !avail.available;
     startBtn.textContent = mode === 'practice' ? 'Start Practice →' : 'Start Exam →';
   }
 
   if (mode === 'exam') {
     const input = document.getElementById('studentNameInput');
     if (input) {
-      input.disabled = false;
-      setTimeout(() => input.focus(), 0);
+      input.disabled = !avail.available;
+      if (avail.available) setTimeout(() => input.focus(), 0);
     }
   }
+  updateScheduleUI();
 }
 
 function backToModeChoices() {
@@ -898,6 +1077,12 @@ document.getElementById('replayScrubber')?.addEventListener('input', (e) => {
 });
 
 document.getElementById('closeReplayModalBtn')?.addEventListener('click', closeReplayModal);
+
+document.getElementById('openScheduleModalBtn')?.addEventListener('click', promptExamScheduleSettings);
+document.getElementById('closeExamScheduleModalBtn')?.addEventListener('click', closeScheduleModal);
+document.getElementById('scheduleCancelBtn')?.addEventListener('click', closeScheduleModal);
+document.getElementById('scheduleSaveBtn')?.addEventListener('click', saveScheduleFromModal);
+document.getElementById('scheduleClearBtn')?.addEventListener('click', clearScheduleFromModal);
 
 /* ============================= REFERENCE TABLES ============================= */
 function renderReferenceTables(db) {

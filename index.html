@@ -178,7 +178,12 @@
           <span class="mc-title">Exam Mode</span>
           <span class="mc-desc">One attempt per student. Timer starts on first keystroke. Hint use reduces max score to
             30/50.</span>
+          <div id="examScheduleNotice" style="margin-top:8px; font-family:var(--mono); font-size:10.5px; color:var(--amber); display:none;"></div>
         </div>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; margin:-8px 0 12px;">
+        <button class="btn-ghost" id="openScheduleModalBtn" type="button" style="font-size:11px; padding:3px 9px; border-color:var(--border);">⚙ Set Exam Schedule (Teacher)</button>
       </div>
 
       <div style="font-family:var(--mono); font-size:11.5px; color:var(--text-faint); margin-bottom:12px;"
@@ -304,6 +309,49 @@
         </div>
       </div>
 
+    </div>
+  </div>
+
+  <!-- Exam Schedule Settings modal overlay (Teacher Password Required: iamatomic) -->
+  <div class="modal-overlay" id="examScheduleModalOverlay">
+    <div class="modal" style="max-width:480px; text-align:left; padding:24px;">
+      <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
+        <h2 style="margin:0; font-size:15px; color:var(--cyan); display:flex; align-items:center; gap:6px;">
+          ⚙ Exam Mode Schedule Settings
+        </h2>
+        <button class="btn-ghost" id="closeExamScheduleModalBtn" type="button" style="padding:4px 10px;">✕ Close</button>
+      </div>
+      <p style="font-family:var(--mono); font-size:11.5px; color:var(--text-dim); margin:0 0 16px;">
+        Set the timeframe (Start &amp; End Date/Time) when Exam Mode is accessible to students.
+      </p>
+
+      <div style="background:var(--panel-alt); border:1px solid var(--border); border-radius:8px; padding:16px; margin-bottom:16px;">
+        <label style="display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:13px; font-weight:600; color:var(--text); cursor:pointer; margin-bottom:14px;">
+          <input type="checkbox" id="scheduleEnableCheckbox" style="accent-color:var(--cyan); width:16px; height:16px;">
+          Enable Exam Schedule Restriction
+        </label>
+
+        <div id="scheduleFieldsWrap" style="display:flex; flex-direction:column; gap:12px; opacity:0.5; pointer-events:none; transition:opacity .2s;">
+          <div>
+            <label style="display:block; font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase; letter-spacing:.05em;">Start Date &amp; Time (Month, Day, Year, Time)</label>
+            <input type="datetime-local" id="scheduleStartInput" style="width:100%; font-family:var(--mono); font-size:13px; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:8px 10px; outline:none; box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="display:block; font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase; letter-spacing:.05em;">End Date &amp; Time (Month, Day, Year, Time)</label>
+            <input type="datetime-local" id="scheduleEndInput" style="width:100%; font-family:var(--mono); font-size:13px; color:var(--text); background:var(--panel); border:1px solid var(--border); border-radius:6px; padding:8px 10px; outline:none; box-sizing:border-box;">
+          </div>
+        </div>
+      </div>
+
+      <div id="scheduleModalStatus" style="font-family:var(--mono); font-size:11.5px; margin-bottom:14px; display:none;"></div>
+
+      <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+        <button class="btn-ghost" id="scheduleClearBtn" type="button" style="color:var(--red); border-color:#5c2424;">Clear Schedule</button>
+        <div style="display:flex; gap:10px;">
+          <button class="secondary" id="scheduleCancelBtn" type="button">Cancel</button>
+          <button class="primary" id="scheduleSaveBtn" type="button" style="margin-top:0;">Save Schedule</button>
+        </div>
+      </div>
     </div>
   </div>
 

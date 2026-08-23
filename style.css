@@ -356,7 +356,13 @@
   font-weight: 700;
   animation: blink 1s infinite;
 }
-@keyframes blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
+.mode-card.disabled {
+  opacity: 0.65;
+  border-color: var(--border) !important;
+  cursor: not-allowed;
+  background: var(--panel-alt);
+}
+.mode-card.disabled:hover {
+  transform: none !important;
+  box-shadow: none !important;
 }
