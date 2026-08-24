@@ -265,15 +265,32 @@ let examSchedule = {
 };
 
 function loadExamSchedule() {
-  try {
-    const raw = localStorage.getItem(SCHEDULE_KEY);
-    if (raw) examSchedule = JSON.parse(raw);
-  } catch (e) {
-    examSchedule = { enabled: false, startISO: '', endISO: '' };
+  initFirebase();
+  if (isFirebaseConfigured && scheduleDbRef) {
+    scheduleDbRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        examSchedule = data;
+      } else {
+        examSchedule = { enabled: false, startISO: '', endISO: '' };
+      }
+      updateScheduleUI();
+    });
+  } else {
+    try {
+      const raw = localStorage.getItem(SCHEDULE_KEY);
+      if (raw) examSchedule = JSON.parse(raw);
+    } catch (e) {
+      examSchedule = { enabled: false, startISO: '', endISO: '' };
+    }
+    updateScheduleUI();
   }
 }
 
 function saveExamSchedule() {
+  if (isFirebaseConfigured && scheduleDbRef) {
+    scheduleDbRef.set(examSchedule);
+  }
   try {
     localStorage.setItem(SCHEDULE_KEY, JSON.stringify(examSchedule));
   } catch (e) { /* ignore storage error */ }
@@ -758,6 +775,7 @@ const firebaseConfig = {
 };
 
 let dbRef = null;
+let scheduleDbRef = null;
 let isFirebaseConfigured = false;
 
 function initFirebase() {
@@ -767,6 +785,7 @@ function initFirebase() {
         firebase.initializeApp(firebaseConfig);
       }
       dbRef = firebase.database().ref('leaderboard');
+      scheduleDbRef = firebase.database().ref('examSchedule');
       isFirebaseConfigured = true;
       console.log('Firebase Cloud Database initialized successfully.');
     } catch (e) {
