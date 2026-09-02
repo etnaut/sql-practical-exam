@@ -9,6 +9,9 @@
   <!-- Firebase SDK -->
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
   <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-database-compat.js"></script>
+  <!-- jsPDF & jsPDF-AutoTable for Leaderboard PDF Export -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.31/jspdf.plugin.autotable.min.js"></script>
   <link rel="stylesheet" href="style.css">
 </head>
 
@@ -149,7 +152,8 @@
       <div class="table-scroll" id="leaderboardArea" style="max-height:280px;">
         <div class="empty-msg">No one has finished the exam yet — scores will appear here as students complete it.</div>
       </div>
-      <div class="row-count" style="display:flex; justify-content:flex-end;">
+      <div class="row-count" style="display:flex; justify-content:flex-end; gap:8px;">
+        <button class="btn-ghost" id="downloadPdfBtn" style="padding:3px 9px; font-size:10.5px;">📄 download pdf</button>
         <button class="btn-ghost" id="clearLeaderboardBtn" style="padding:3px 9px; font-size:10.5px;">clear
           leaderboard</button>
       </div>
@@ -251,7 +255,10 @@
         <div class="empty-msg">No one has finished the exam yet — scores will appear here as students complete it.</div>
       </div>
       <div style="display:flex; justify-content:space-between; align-items:center; margin-top:16px; flex-wrap:wrap; gap:10px;">
-        <button class="btn-ghost" id="modalClearLeaderboardBtn" type="button" style="color:var(--red); border-color:#5c2424;">clear leaderboard</button>
+        <div style="display:flex; gap:8px;">
+          <button class="btn-ghost" id="modalDownloadPdfBtn" type="button" style="color:var(--cyan); border-color:var(--border);">📄 download pdf</button>
+          <button class="btn-ghost" id="modalClearLeaderboardBtn" type="button" style="color:var(--red); border-color:#5c2424;">clear leaderboard</button>
+        </div>
         <button class="secondary" id="modalLeaderboardCloseBtn" type="button">Back</button>
       </div>
     </div>

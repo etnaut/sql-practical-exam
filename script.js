@@ -935,6 +935,130 @@ function clearLeaderboardWithPassword() {
 document.getElementById('clearLeaderboardBtn')?.addEventListener('click', clearLeaderboardWithPassword);
 document.getElementById('modalClearLeaderboardBtn')?.addEventListener('click', clearLeaderboardWithPassword);
 
+/* ============================= PDF EXPORT ============================= */
+function downloadLeaderboardPDF() {
+  const q = leaderboardSearchQuery.trim().toLowerCase();
+  const sorted = leaderboard.slice().sort((a, b) => b.score - a.score);
+  const filtered = q
+    ? sorted.filter(e =>
+        (e.name && e.name.toLowerCase().includes(q)) ||
+        (e.topic && e.topic.toLowerCase().includes(q)) ||
+        (e.questionText && e.questionText.toLowerCase().includes(q))
+      )
+    : sorted;
+
+  if (filtered.length === 0) {
+    alert('No leaderboard data available to export.');
+    return;
+  }
+
+  // Check if jsPDF library is loaded
+  if (window.jspdf && window.jspdf.jsPDF) {
+    const { jsPDF } = window.jspdf;
+    const doc = new jsPDF();
+
+    // Document Header
+    doc.setFont("helvetica", "bold");
+    doc.setFontSize(16);
+    doc.text("SQL Practical Exam - Leaderboard", 14, 18);
+
+    doc.setFont("helvetica", "normal");
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    const dateStr = new Date().toLocaleString();
+    doc.text(`Generated on: ${dateStr} | Total Records: ${filtered.length}`, 14, 25);
+
+    // Build table rows containing ONLY Name, Question, and Score
+    const tableBody = filtered.map(e => [
+      e.name || '—',
+      e.topic || e.questionText || '—',
+      `${e.score} / ${e.maxScore}`
+    ]);
+
+    doc.autoTable({
+      startY: 30,
+      head: [['Name', 'Question', 'Score']],
+      body: tableBody,
+      theme: 'grid',
+      headStyles: {
+        fillColor: [15, 23, 42],
+        textColor: [255, 255, 255],
+        fontStyle: 'bold',
+        fontSize: 11
+      },
+      bodyStyles: {
+        fontSize: 10,
+        textColor: [30, 41, 59]
+      },
+      alternateRowStyles: {
+        fillColor: [248, 250, 252]
+      },
+      columnStyles: {
+        0: { cellWidth: 55 },
+        1: { cellWidth: 100 },
+        2: { cellWidth: 35, halign: 'center' }
+      }
+    });
+
+    doc.save('leaderboard.pdf');
+  } else {
+    // Fallback print window if jsPDF CDN is unavailable
+    const printWin = window.open('', '_blank');
+    if (!printWin) {
+      alert('Pop-up blocked. Please allow pop-ups to print the leaderboard PDF.');
+      return;
+    }
+
+    let rowsHtml = filtered.map(e => `
+      <tr>
+        <td style="padding:8px; border:1px solid #ddd;">${escapeHTML(e.name || '—')}</td>
+        <td style="padding:8px; border:1px solid #ddd;">${escapeHTML(e.topic || e.questionText || '—')}</td>
+        <td style="padding:8px; border:1px solid #ddd; text-align:center;">${e.score} / ${e.maxScore}</td>
+      </tr>
+    `).join('');
+
+    printWin.document.write(`
+      <!DOCTYPE html>
+      <html>
+      <head>
+        <title>Leaderboard PDF</title>
+        <style>
+          body { font-family: Arial, sans-serif; padding: 20px; color: #333; }
+          h2 { margin-bottom: 5px; }
+          .meta { font-size: 12px; color: #666; margin-bottom: 20px; }
+          table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+          th { background: #0f172a; color: white; padding: 10px; border: 1px solid #0f172a; text-align: left; }
+          th.center, td.center { text-align: center; }
+        </style>
+      </head>
+      <body>
+        <h2>SQL Practical Exam - Leaderboard</h2>
+        <div class="meta">Generated: ${new Date().toLocaleString()} | Entries: ${filtered.length}</div>
+        <table>
+          <thead>
+            <tr>
+              <th>Name</th>
+              <th>Question</th>
+              <th class="center">Score</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rowsHtml}
+          </tbody>
+        </table>
+        <script>
+          window.onload = function() { window.print(); window.close(); };
+        <\/script>
+      </body>
+      </html>
+    `);
+    printWin.document.close();
+  }
+}
+
+document.getElementById('downloadPdfBtn')?.addEventListener('click', downloadLeaderboardPDF);
+document.getElementById('modalDownloadPdfBtn')?.addEventListener('click', downloadLeaderboardPDF);
+
 function openLeaderboardModal() {
   renderLeaderboard();
   document.getElementById('leaderboardModalOverlay')?.classList.add('show');
