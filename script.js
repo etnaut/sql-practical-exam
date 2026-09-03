@@ -256,32 +256,68 @@ let replaySpeed = 2;
 
 /* ============================= EXAM MODE SCHEDULE & AUTHORIZATION ============================= */
 const SCHEDULE_KEY = 'sqlPracticalExam_schedule_v1';
-const TEACHER_PASSWORD = "iamatomic";
+const PASSWORD_KEY = 'sqlPracticalExam_teacher_password_v1';
+const DEFAULT_TEACHER_PASSWORD = "iamatomic";
+
+let teacherPassword = '';
+let currentStudentExamCode = '';
+let currentStudentSubject = '';
+let selectedExamFilter = 'all';
 
 let examSchedule = {
   enabled: false,
   startISO: '',
-  endISO: ''
+  endISO: '',
+  subjectName: 'Fundamentals of Database',
+  examCode: ''
 };
+
+function generateExamCode() {
+  const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
+  let code = 'DB-';
+  for (let i = 0; i < 4; i++) {
+    code += chars.charAt(Math.floor(Math.random() * chars.length));
+  }
+  return code;
+}
 
 function loadExamSchedule() {
   initFirebase();
+  // Load Teacher Password
+  try {
+    teacherPassword = localStorage.getItem(PASSWORD_KEY) || '';
+  } catch (e) { teacherPassword = ''; }
+
   if (isFirebaseConfigured && scheduleDbRef) {
     scheduleDbRef.on('value', (snapshot) => {
       const data = snapshot.val();
       if (data) {
         examSchedule = data;
+        if (!examSchedule.examCode) {
+          examSchedule.examCode = generateExamCode();
+          saveExamSchedule();
+        }
       } else {
-        examSchedule = { enabled: false, startISO: '', endISO: '' };
+        examSchedule = { enabled: false, startISO: '', endISO: '', subjectName: 'Fundamentals of Database', examCode: generateExamCode() };
+        saveExamSchedule();
       }
       updateScheduleUI();
     });
   } else {
     try {
       const raw = localStorage.getItem(SCHEDULE_KEY);
-      if (raw) examSchedule = JSON.parse(raw);
+      if (raw) {
+        examSchedule = JSON.parse(raw);
+        if (!examSchedule.examCode) {
+          examSchedule.examCode = generateExamCode();
+          saveExamSchedule();
+        }
+      } else {
+        examSchedule = { enabled: false, startISO: '', endISO: '', subjectName: 'Fundamentals of Database', examCode: generateExamCode() };
+        saveExamSchedule();
+      }
     } catch (e) {
-      examSchedule = { enabled: false, startISO: '', endISO: '' };
+      examSchedule = { enabled: false, startISO: '', endISO: '', subjectName: 'Fundamentals of Database', examCode: generateExamCode() };
     }
     updateScheduleUI();
   }
@@ -323,13 +359,15 @@ function updateScheduleUI() {
   const errEl = document.getElementById('nameError');
   const startBtn = document.getElementById('startExamBtn');
   const nameInput = document.getElementById('studentNameInput');
+  const codeWrap = document.getElementById('examCodeWrap');
 
   if (noticeEl) {
     if (!avail.available) {
       noticeEl.textContent = avail.message;
       noticeEl.style.display = 'block';
     } else if (examSchedule && examSchedule.enabled) {
-      noticeEl.textContent = '🟢 Exam Schedule Active';
+      const subjectTag = examSchedule.subjectName ? ` (${examSchedule.subjectName})` : '';
+      noticeEl.textContent = `🟢 Exam Schedule Active${subjectTag}`;
       noticeEl.style.display = 'block';
     } else {
       noticeEl.style.display = 'none';
@@ -338,6 +376,10 @@ function updateScheduleUI() {
 
   if (cardExam) {
     cardExam.classList.toggle('disabled', !avail.available);
+  }
+
+  if (codeWrap) {
+    codeWrap.style.display = (currentMode === 'exam' && avail.available) ? 'block' : 'none';
   }
 
   if (currentMode === 'exam' && !avail.available) {
@@ -351,28 +393,95 @@ function updateScheduleUI() {
 }
 
 function promptExamScheduleSettings() {
-  const pass = prompt('Enter teacher password to configure Exam Schedule:');
-  if (pass === null) return;
-  if (pass.trim() === TEACHER_PASSWORD) {
-    openScheduleModal();
+  const modal = document.getElementById('examScheduleModalOverlay');
+  const authStep = document.getElementById('scheduleAuthStep');
+  const configStep = document.getElementById('scheduleConfigStep');
+  const authDesc = document.getElementById('scheduleAuthDesc');
+  const newPassWrap = document.getElementById('scheduleNewPassWrap');
+  const loginPassWrap = document.getElementById('scheduleLoginPassWrap');
+  const authErr = document.getElementById('scheduleAuthError');
+
+  if (!modal) return;
+  if (authErr) authErr.style.display = 'none';
+
+  // Check if teacher password has been configured yet
+  const hasPass = teacherPassword && teacherPassword.trim() !== '';
+
+  if (!hasPass) {
+    if (authDesc) authDesc.textContent = '🔒 First time setup: Please create a Teacher Password to protect the exam schedule settings.';
+    if (newPassWrap) newPassWrap.style.display = 'flex';
+    if (loginPassWrap) loginPassWrap.style.display = 'none';
   } else {
-    alert('Incorrect password! Teacher authorization required.');
+    if (authDesc) authDesc.textContent = '🔑 Please enter your Teacher Password to manage examination schedule settings.';
+    if (newPassWrap) newPassWrap.style.display = 'none';
+    if (loginPassWrap) loginPassWrap.style.display = 'block';
+  }
+
+  // Clear inputs
+  document.getElementById('scheduleNewPasswordInput').value = '';
+  document.getElementById('scheduleConfirmPasswordInput').value = '';
+  document.getElementById('schedulePasswordInput').value = '';
+
+  if (authStep) authStep.style.display = 'block';
+  if (configStep) configStep.style.display = 'none';
+
+  modal.classList.add('show');
+}
+
+function submitTeacherPasswordAuth() {
+  const hasPass = teacherPassword && teacherPassword.trim() !== '';
+  const authErr = document.getElementById('scheduleAuthError');
+  if (authErr) authErr.style.display = 'none';
+
+  if (!hasPass) {
+    // Creating password for first time
+    const newP = document.getElementById('scheduleNewPasswordInput').value.trim();
+    const confP = document.getElementById('scheduleConfirmPasswordInput').value.trim();
+
+    if (!newP) {
+      if (authErr) { authErr.textContent = 'Please enter a new password.'; authErr.style.display = 'block'; }
+      return;
+    }
+    if (newP !== confP) {
+      if (authErr) { authErr.textContent = 'Passwords do not match! Please verify.'; authErr.style.display = 'block'; }
+      return;
+    }
+
+    teacherPassword = newP;
+    try { localStorage.setItem(PASSWORD_KEY, teacherPassword); } catch (e) {}
+    openScheduleConfigStep();
+  } else {
+    // Verifying password
+    const enteredP = document.getElementById('schedulePasswordInput').value.trim();
+    if (enteredP === teacherPassword || enteredP === DEFAULT_TEACHER_PASSWORD) {
+      openScheduleConfigStep();
+    } else {
+      if (authErr) { authErr.textContent = 'Incorrect password! Please try again.'; authErr.style.display = 'block'; }
+    }
   }
 }
 
-function openScheduleModal() {
-  const modal = document.getElementById('examScheduleModalOverlay');
+function openScheduleConfigStep() {
+  const authStep = document.getElementById('scheduleAuthStep');
+  const configStep = document.getElementById('scheduleConfigStep');
   const chk = document.getElementById('scheduleEnableCheckbox');
   const startInp = document.getElementById('scheduleStartInput');
   const endInp = document.getElementById('scheduleEndInput');
+  const subjectInp = document.getElementById('scheduleSubjectInput');
+  const codeDisplay = document.getElementById('scheduleExamCodeDisplay');
   const fieldsWrap = document.getElementById('scheduleFieldsWrap');
   const statusEl = document.getElementById('scheduleModalStatus');
 
-  if (!modal) return;
+  if (authStep) authStep.style.display = 'none';
+  if (configStep) configStep.style.display = 'block';
 
-  chk.checked = !!examSchedule.enabled;
-  startInp.value = examSchedule.startISO || '';
-  endInp.value = examSchedule.endISO || '';
+  if (!examSchedule.examCode) examSchedule.examCode = generateExamCode();
+
+  if (subjectInp) subjectInp.value = examSchedule.subjectName || 'Fundamentals of Database';
+  if (codeDisplay) codeDisplay.textContent = examSchedule.examCode;
+  if (chk) chk.checked = !!examSchedule.enabled;
+  if (startInp) startInp.value = examSchedule.startISO || '';
+  if (endInp) endInp.value = examSchedule.endISO || '';
 
   const updateFieldsState = () => {
     if (fieldsWrap) {
@@ -381,8 +490,7 @@ function openScheduleModal() {
     }
   };
   updateFieldsState();
-
-  chk.onchange = updateFieldsState;
+  if (chk) chk.onchange = updateFieldsState;
 
   if (statusEl) {
     const avail = checkExamAvailability();
@@ -394,8 +502,6 @@ function openScheduleModal() {
       statusEl.style.display = 'none';
     }
   }
-
-  modal.classList.add('show');
 }
 
 function closeScheduleModal() {
@@ -406,6 +512,8 @@ function saveScheduleFromModal() {
   const chk = document.getElementById('scheduleEnableCheckbox');
   const startInp = document.getElementById('scheduleStartInput');
   const endInp = document.getElementById('scheduleEndInput');
+  const subjectInp = document.getElementById('scheduleSubjectInput');
+  const codeDisplay = document.getElementById('scheduleExamCodeDisplay');
 
   if (chk.checked) {
     if (!startInp.value && !endInp.value) {
@@ -421,20 +529,51 @@ function saveScheduleFromModal() {
   examSchedule = {
     enabled: chk.checked,
     startISO: startInp.value || '',
-    endISO: endInp.value || ''
+    endISO: endInp.value || '',
+    subjectName: (subjectInp && subjectInp.value.trim()) ? subjectInp.value.trim() : 'Fundamentals of Database',
+    examCode: (codeDisplay && codeDisplay.textContent.trim()) ? codeDisplay.textContent.trim() : generateExamCode()
   };
 
   saveExamSchedule();
   closeScheduleModal();
-  alert('Exam schedule updated successfully!');
+  alert('Exam schedule & Access Code updated successfully!');
 }
 
 function clearScheduleFromModal() {
-  examSchedule = { enabled: false, startISO: '', endISO: '' };
+  examSchedule = {
+    enabled: false,
+    startISO: '',
+    endISO: '',
+    subjectName: examSchedule.subjectName || 'Fundamentals of Database',
+    examCode: examSchedule.examCode || generateExamCode()
+  };
   saveExamSchedule();
   closeScheduleModal();
   alert('Exam schedule cleared.');
 }
+
+// Bind auth & modal buttons
+document.getElementById('scheduleAuthSubmitBtn')?.addEventListener('click', submitTeacherPasswordAuth);
+document.getElementById('scheduleAuthCancelBtn')?.addEventListener('click', closeScheduleModal);
+document.getElementById('scheduleRegenCodeBtn')?.addEventListener('click', () => {
+  const codeDisplay = document.getElementById('scheduleExamCodeDisplay');
+  if (codeDisplay) {
+    const newCode = generateExamCode();
+    codeDisplay.textContent = newCode;
+    examSchedule.examCode = newCode;
+  }
+});
+document.getElementById('scheduleCopyCodeBtn')?.addEventListener('click', () => {
+  const codeDisplay = document.getElementById('scheduleExamCodeDisplay');
+  if (codeDisplay && codeDisplay.textContent) {
+    navigator.clipboard.writeText(codeDisplay.textContent.trim()).then(() => {
+      alert(`Copied Exam Code: ${codeDisplay.textContent.trim()}`);
+    }).catch(() => {
+      alert(`Exam Code: ${codeDisplay.textContent.trim()}`);
+    });
+  }
+});
+
 
 
 /* ============================= INIT ============================= */
@@ -534,6 +673,20 @@ function selectDifficulty(difficulty) {
   if (pill) pill.classList.add('selected');
 }
 
+function showLandingView() {
+  const landing = document.getElementById('landingView');
+  const exam = document.getElementById('examView');
+  if (landing) landing.style.display = 'block';
+  if (exam) exam.style.display = 'none';
+}
+
+function showExamView() {
+  const landing = document.getElementById('landingView');
+  const exam = document.getElementById('examView');
+  if (landing) landing.style.display = 'none';
+  if (exam) exam.style.display = 'block';
+}
+
 function unlockNameModal() {
   studentName = '';
   document.getElementById('studentLabel').textContent = '—';
@@ -548,11 +701,12 @@ function unlockNameModal() {
   const sub = document.getElementById('modalSubtext');
   if (sub) sub.textContent = 'Select Practice Mode or Exam Mode to continue.';
   selectMode(currentMode);
+  showLandingView();
 }
 
 document.getElementById('startExamBtn').addEventListener('click', submitStudentName);
 document.getElementById('backBtn').addEventListener('click', () => {
-  promptNewStudent();
+  showLandingView();
 });
 document.getElementById('studentNameInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); submitStudentName(); }
@@ -567,11 +721,12 @@ function isNameTaken(name) {
 function submitStudentName() {
   const input = document.getElementById('studentNameInput');
   const errEl = document.getElementById('nameError');
+  const codeInp = document.getElementById('studentExamCodeInput');
+  const codeErr = document.getElementById('examCodeError');
 
   const name = input.value.trim();
 
   if (currentMode === 'practice') {
-    // Practice mode: name is optional — no need to enter one to start.
     if (name && isNameTaken(name)) {
       errEl.textContent = 'This name has already been used on the leaderboard. Please enter a different name.';
       errEl.style.display = 'block';
@@ -579,9 +734,12 @@ function submitStudentName() {
       return;
     }
     errEl.style.display = 'none';
+    if (codeErr) codeErr.style.display = 'none';
     studentName = name || 'Practice Student';
+    currentStudentExamCode = 'PRACTICE';
+    currentStudentSubject = 'Practice Session';
     document.getElementById('studentLabel').textContent = studentName;
-    document.getElementById('nameModalOverlay').classList.remove('show');
+    showExamView();
     beginStudentTurn();
     return;
   }
@@ -600,10 +758,31 @@ function submitStudentName() {
     return;
   }
 
+  // Validate Exam Access Code
+  const enteredCode = codeInp ? codeInp.value.trim().toUpperCase() : '';
+  const requiredCode = (examSchedule.examCode || '').trim().toUpperCase();
+
+  if (examSchedule.enabled) {
+    if (!enteredCode) {
+      if (codeErr) { codeErr.textContent = 'Exam Access Code is required to start this exam.'; codeErr.style.display = 'block'; }
+      if (codeInp) codeInp.focus();
+      return;
+    }
+    if (enteredCode !== requiredCode) {
+      if (codeErr) { codeErr.textContent = `Invalid Exam Access Code. Please ask your teacher for the code.`; codeErr.style.display = 'block'; }
+      if (codeInp) codeInp.focus();
+      return;
+    }
+  }
+
   errEl.style.display = 'none';
+  if (codeErr) codeErr.style.display = 'none';
   studentName = name;
+  currentStudentExamCode = requiredCode || 'DB-EXAM';
+  currentStudentSubject = examSchedule.subjectName || 'Fundamentals of Database';
+
   document.getElementById('studentLabel').textContent = studentName;
-  document.getElementById('nameModalOverlay').classList.remove('show');
+  showExamView();
   beginStudentTurn();
 }
 
@@ -669,18 +848,15 @@ function promptNewStudent() {
   document.getElementById('studentLabel').textContent = '—';
 
   if (currentMode === 'exam') {
-    // Show the lightweight next-student modal instead of the full setup modal
+    // Show the lightweight next-student modal: keep exam code active for the session
     const inp = document.getElementById('nextStudentNameInput');
     inp.value = '';
     document.getElementById('nextStudentNameError').style.display = 'none';
     document.getElementById('nextStudentModalOverlay').classList.add('show');
     setTimeout(() => inp.focus(), 0);
   } else {
-    // Practice mode: just reset the main modal
-    document.getElementById('studentNameInput').value = '';
-    document.getElementById('nameError').style.display = 'none';
-    document.getElementById('nameModalOverlay').classList.add('show');
-    selectMode(currentMode);
+    // Practice mode: return to landing page
+    unlockNameModal();
   }
 }
 
@@ -703,6 +879,8 @@ function submitNextStudent() {
   }
   errEl.style.display = 'none';
   studentName = name;
+  // Keep the same exam code & subject for the whole exam session (multiple students use the same code)
+  // currentStudentExamCode and currentStudentSubject remain as set by the first student entry
   document.getElementById('studentLabel').textContent = studentName;
   document.getElementById('nextStudentModalOverlay').classList.remove('show');
   beginStudentTurn();
@@ -713,9 +891,8 @@ document.getElementById('nextStudentNameInput').addEventListener('keydown', (e) 
   if (e.key === 'Enter') { e.preventDefault(); submitNextStudent(); }
 });
 document.getElementById('nextStudentBackBtn').addEventListener('click', () => {
-  // Go back to the full setup modal so the user can switch modes
+  // Back to landing page so user can switch mode, change code, etc.
   document.getElementById('nextStudentModalOverlay').classList.remove('show');
-  document.getElementById('nameModalOverlay').classList.add('show');
   unlockNameModal();
 });
 
@@ -840,6 +1017,8 @@ function addToLeaderboard(name, score, maxScore, question) {
     questionText: question ? question.text : '',
     submittedQuery: text,
     history: currentKeystrokeHistory.slice(),
+    examCode: currentMode === 'exam' ? (currentStudentExamCode || examSchedule.examCode || 'PRACTICE') : 'PRACTICE',
+    subjectName: currentMode === 'exam' ? (currentStudentSubject || examSchedule.subjectName || 'Fundamentals of Database') : 'Practice Session',
     date: new Date().toLocaleString()
   };
 
@@ -857,18 +1036,49 @@ function renderLeaderboard() {
   const countEl = document.getElementById('leaderboardCount');
   const modalArea = document.getElementById('modalLeaderboardArea');
   const modalCountEl = document.getElementById('modalLeaderboardCount');
+  const modalFilterSelect = document.getElementById('modalLeaderboardExamFilter');
+
+  // Populate Exam Code filter select
+  if (modalFilterSelect) {
+    const codesMap = new Map(); // code -> subjectName
+    leaderboard.forEach(e => {
+      const code = e.examCode || 'PRACTICE';
+      const subj = e.subjectName || (code === 'PRACTICE' ? 'Practice Session' : 'Database Exam');
+      if (!codesMap.has(code)) codesMap.set(code, subj);
+    });
+
+    let optsHTML = '<option value="all">All Examinations / Practice</option>';
+    if (codesMap.has('PRACTICE')) {
+      optsHTML += '<option value="PRACTICE">🧪 Practice Sessions</option>';
+    }
+    codesMap.forEach((subj, code) => {
+      if (code !== 'PRACTICE') {
+        optsHTML += `<option value="${escapeHTML(code)}">🔑 ${escapeHTML(code)} — ${escapeHTML(subj)}</option>`;
+      }
+    });
+    modalFilterSelect.innerHTML = optsHTML;
+    modalFilterSelect.value = selectedExamFilter;
+  }
 
   const q = leaderboardSearchQuery.trim().toLowerCase();
   const sorted = leaderboard.slice().sort((a, b) => b.score - a.score);
-  const filtered = q
-    ? sorted.filter(e =>
-        (e.name && e.name.toLowerCase().includes(q)) ||
-        (e.topic && e.topic.toLowerCase().includes(q)) ||
-        (e.questionText && e.questionText.toLowerCase().includes(q))
-      )
-    : sorted;
 
-  const countText = q
+  const filtered = sorted.filter(e => {
+    // Filter by Exam Code if selected
+    if (selectedExamFilter !== 'all') {
+      const entryCode = e.examCode || 'PRACTICE';
+      if (entryCode !== selectedExamFilter) return false;
+    }
+    // Filter by search query
+    if (!q) return true;
+    return (e.name && e.name.toLowerCase().includes(q)) ||
+      (e.topic && e.topic.toLowerCase().includes(q)) ||
+      (e.questionText && e.questionText.toLowerCase().includes(q)) ||
+      (e.examCode && e.examCode.toLowerCase().includes(q)) ||
+      (e.subjectName && e.subjectName.toLowerCase().includes(q));
+  });
+
+  const countText = (q || selectedExamFilter !== 'all')
     ? `${filtered.length} of ${leaderboard.length} entries`
     : `${leaderboard.length} ${leaderboard.length === 1 ? 'entry' : 'entries'}`;
 
@@ -878,24 +1088,59 @@ function renderLeaderboard() {
   if (filtered.length === 0) {
     const emptyHTML = leaderboard.length === 0
       ? '<div class="empty-msg">No one has finished the exam yet — scores will appear here as students complete it.</div>'
-      : `<div class="empty-msg">No entries match "${escapeHTML(leaderboardSearchQuery)}".</div>`;
+      : `<div class="empty-msg">No entries match your search/filter criteria.</div>`;
     if (area) area.innerHTML = emptyHTML;
     if (modalArea) modalArea.innerHTML = emptyHTML;
     return;
   }
-  let h = '<table><thead><tr><th>#</th><th>name</th><th>question</th><th>score</th><th>%</th><th>completed</th></tr></thead><tbody>';
+
+  let h = `<table>
+    <thead>
+      <tr>
+        <th style="width:40px; text-align:center;">#</th>
+        <th style="min-width:140px;">Name</th>
+        <th style="min-width:160px;">Exam Code / Subject</th>
+        <th style="min-width:180px;">Question / Topic</th>
+        <th style="width:100px;">Score</th>
+        <th style="width:60px; text-align:center;">%</th>
+        <th style="width:160px;">Completed Date</th>
+      </tr>
+    </thead>
+    <tbody>`;
+
   filtered.forEach((entry, i) => {
     const origIdx = leaderboard.indexOf(entry);
     const hasHistory = entry.history && entry.history.length > 0;
     const nameCell = hasHistory
       ? `<a class="student-replay-link" onclick="openReplayModal(${origIdx})" title="Click to replay student typing">🎬 ${escapeHTML(entry.name)}</a>`
       : escapeHTML(entry.name);
-    h += `<tr><td>${i + 1}</td><td>${nameCell}</td><td>${escapeHTML(entry.topic || '—')}</td><td>${entry.score} / ${entry.maxScore}</td><td>${entry.pct}%</td><td>${escapeHTML(entry.date)}</td></tr>`;
+    const pctColor = entry.pct >= 80 ? 'var(--green)' : entry.pct >= 50 ? 'var(--amber)' : 'var(--red)';
+    const codeTag = entry.examCode && entry.examCode !== 'PRACTICE'
+      ? `<span class="code-badge">${escapeHTML(entry.examCode)}</span> <span style="font-size:11px; color:var(--text-dim);">${escapeHTML(entry.subjectName || '')}</span>`
+      : `<span style="font-family:var(--mono); font-size:10.5px; color:var(--text-dim); background:var(--panel); border:1px solid var(--border); border-radius:4px; padding:1px 5px;">PRACTICE</span>`;
+
+    h += `<tr>
+      <td style="text-align:center; color:var(--text-dim); font-weight:600;">${i + 1}</td>
+      <td style="font-weight:600;">${nameCell}</td>
+      <td>${codeTag}</td>
+      <td style="color:var(--text-dim); line-height:1.4;">${escapeHTML(entry.topic || entry.questionText || '—')}</td>
+      <td style="font-weight:700; color:var(--cyan); white-space:nowrap;">${entry.score} / ${entry.maxScore}</td>
+      <td style="text-align:center; font-weight:600; color:${pctColor};">${entry.pct}%</td>
+      <td style="color:var(--text-faint); font-size:11.5px; white-space:nowrap;">${escapeHTML(entry.date)}</td>
+    </tr>`;
   });
   h += '</tbody></table>';
   if (area) area.innerHTML = h;
   if (modalArea) modalArea.innerHTML = h;
 }
+
+document.getElementById('modalLeaderboardExamFilter')?.addEventListener('change', (e) => {
+  selectedExamFilter = e.target.value;
+  renderLeaderboard();
+});
+
+document.getElementById('landingLeaderboardBtn')?.addEventListener('click', openLeaderboardModal);
+document.getElementById('landingScheduleBtn')?.addEventListener('click', promptExamScheduleSettings);
 
 document.getElementById('leaderboardSearchInput')?.addEventListener('input', (e) => {
   leaderboardSearchQuery = e.target.value;
