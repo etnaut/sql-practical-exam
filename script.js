@@ -254,6 +254,14 @@ let replayTimer = null;
 let isReplaying = false;
 let replaySpeed = 2;
 
+/* ============================= TAB SWITCH ANTI-CHEAT STATE ============================= */
+let tabSwitchWarningShown = false;
+let tabSwitchAckTimer = null;
+let tabSwitchAckRemaining = 10;
+let tabSwitchPenaltyTimer = null;
+let tabSwitchPenaltyRemaining = 30;
+let tabSwitchPenaltyActive = false;
+
 /* ============================= EXAM MODE SCHEDULE & AUTHORIZATION ============================= */
 const SCHEDULE_KEY = 'sqlPracticalExam_schedule_v1';
 const PASSWORD_KEY = 'sqlPracticalExam_teacher_password_v1';
@@ -674,6 +682,7 @@ function selectDifficulty(difficulty) {
 }
 
 function showLandingView() {
+  stopTabSwitchDetection();
   const landing = document.getElementById('landingView');
   const exam = document.getElementById('examView');
   if (landing) landing.style.display = 'block';
@@ -836,14 +845,17 @@ function beginStudentTurn() {
     const chip = document.getElementById('timerChip');
     chip.textContent = '∞ no time limit';
     chip.classList.remove('warn', 'expired');
+    stopTabSwitchDetection();
   } else {
     resetTimerIdle();
+    startTabSwitchDetection();
   }
   updateHud();
 }
 
 function promptNewStudent() {
   stopTimer();
+  stopTabSwitchDetection();
   studentName = '';
   document.getElementById('studentLabel').textContent = '—';
 
@@ -1616,6 +1628,124 @@ function revealHintAuto() {
   livePreview();
 }
 
+/* ============================= TAB SWITCH ANTI-CHEAT ENGINE ============================= */
+function startTabSwitchDetection() {
+  stopTabSwitchDetection();
+  document.addEventListener('visibilitychange', handleTabSwitchEvent);
+  window.addEventListener('blur', handleTabSwitchEvent);
+}
+
+function stopTabSwitchDetection() {
+  document.removeEventListener('visibilitychange', handleTabSwitchEvent);
+  window.removeEventListener('blur', handleTabSwitchEvent);
+  clearTabSwitchTimers();
+  closeTabSwitchWarningModal();
+}
+
+function clearTabSwitchTimers() {
+  if (tabSwitchAckTimer) { clearInterval(tabSwitchAckTimer); tabSwitchAckTimer = null; }
+  if (tabSwitchPenaltyTimer) { clearInterval(tabSwitchPenaltyTimer); tabSwitchPenaltyTimer = null; }
+  tabSwitchWarningShown = false;
+  tabSwitchPenaltyActive = false;
+}
+
+function closeTabSwitchWarningModal() {
+  document.getElementById('tabSwitchWarningOverlay')?.classList.remove('show');
+}
+
+function handleTabSwitchEvent(e) {
+  if (currentMode !== 'exam' || turnSubmitted || tabSwitchWarningShown) return;
+  if (e.type === 'visibilitychange' && !document.hidden) return;
+  triggerTabSwitchNotice();
+}
+
+function triggerTabSwitchNotice() {
+  if (currentMode !== 'exam' || turnSubmitted || tabSwitchWarningShown) return;
+  tabSwitchWarningShown = true;
+  tabSwitchAckRemaining = 10;
+
+  const overlay = document.getElementById('tabSwitchWarningOverlay');
+  const ackCountEl = document.getElementById('tabSwitchAckCountdown');
+  const ackBtn = document.getElementById('tabSwitchAckBtn');
+  const penaltyBar = document.getElementById('tabSwitchPenaltyBar');
+
+  if (ackCountEl) ackCountEl.textContent = tabSwitchAckRemaining;
+  if (ackBtn) {
+    ackBtn.style.display = 'block';
+    ackBtn.textContent = 'I Understand — Continue Exam';
+  }
+  if (penaltyBar) penaltyBar.style.display = 'none';
+
+  overlay?.classList.add('show');
+
+  if (tabSwitchAckTimer) clearInterval(tabSwitchAckTimer);
+  tabSwitchAckTimer = setInterval(() => {
+    tabSwitchAckRemaining--;
+    if (ackCountEl) ackCountEl.textContent = Math.max(0, tabSwitchAckRemaining);
+    if (tabSwitchAckRemaining <= 0) {
+      clearInterval(tabSwitchAckTimer);
+      tabSwitchAckTimer = null;
+      start30sPenaltyCountdown();
+    }
+  }, 1000);
+}
+
+function acknowledgeTabSwitchNotice() {
+  // Student clicked OK → dismiss modal, reset state, NO penalty.
+  clearTabSwitchTimers();
+  closeTabSwitchWarningModal();
+  // Re-arm detection for any further tab-switch during this same turn.
+  if (currentMode === 'exam' && !turnSubmitted) {
+    window.addEventListener('blur', handleTabSwitchEvent);
+    document.addEventListener('visibilitychange', handleTabSwitchEvent);
+  }
+}
+
+function start30sPenaltyCountdown() {
+  if (tabSwitchPenaltyActive) return;
+  tabSwitchPenaltyActive = true;
+  tabSwitchPenaltyRemaining = 30;
+
+  const ackBtn = document.getElementById('tabSwitchAckBtn');
+  const penaltyBar = document.getElementById('tabSwitchPenaltyBar');
+
+  if (ackBtn) ackBtn.style.display = 'none';
+  if (penaltyBar) penaltyBar.style.display = 'block';
+
+  updatePenaltyDisplay();
+
+  if (tabSwitchPenaltyTimer) clearInterval(tabSwitchPenaltyTimer);
+  tabSwitchPenaltyTimer = setInterval(() => {
+    tabSwitchPenaltyRemaining--;
+    updatePenaltyDisplay();
+    if (tabSwitchPenaltyRemaining <= 0) {
+      clearTabSwitchTimers();
+      closeTabSwitchWarningModal();
+      if (!turnSubmitted) {
+        const text = document.getElementById('queryInput')?.value.trim();
+        if (text) {
+          submitAnswer();
+        } else {
+          submitNoAnswer();
+        }
+      }
+    }
+  }, 1000);
+}
+
+function updatePenaltyDisplay() {
+  const countEl = document.getElementById('tabSwitchPenaltyCount');
+  const fillEl = document.getElementById('tabSwitchPenaltyFill');
+  if (countEl) countEl.textContent = Math.max(0, tabSwitchPenaltyRemaining);
+  if (fillEl) {
+    const pct = (Math.max(0, tabSwitchPenaltyRemaining) / 30) * 100;
+    fillEl.style.width = pct + '%';
+  }
+}
+
+document.getElementById('tabSwitchAckBtn')?.addEventListener('click', acknowledgeTabSwitchNotice);
+
+
 /* ============================= SCORING MODEL ============================= */
 // One student, one question, one attempt. Score is based on how close the
 // submitted answer is to the correct result (partial credit), not just right/wrong:
@@ -2044,6 +2174,7 @@ function submitAnswer() {
   const points = calcPoints(result.similarity, hintUsed);
 
   stopTimer();
+  stopTabSwitchDetection();
   turnSubmitted = true;
   lastScore = points;
   addToLeaderboard(studentName, points, MAX_PER_Q, currentQ);
@@ -2089,6 +2220,7 @@ function submitNoAnswer() {
     return;
   }
   stopTimer();
+  stopTabSwitchDetection();
   turnSubmitted = true;
   lastScore = 0;
   addToLeaderboard(studentName, 0, MAX_PER_Q, currentQ);

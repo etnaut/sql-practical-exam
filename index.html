@@ -539,6 +539,37 @@
     </div>
   </div>
 
+  <!-- Tab-switch warning modal (Exam Mode anti-cheat) -->
+  <div class="modal-overlay" id="tabSwitchWarningOverlay">
+    <div class="modal" style="max-width:460px; text-align:center; padding:28px 28px 24px;">
+      <div style="font-size:42px; margin-bottom:10px; line-height:1;">⚠️</div>
+      <h2 style="color:var(--amber); margin:0 0 8px; font-size:18px; letter-spacing:-.01em;">Tab Switch Detected!</h2>
+      <p style="font-family:var(--mono); font-size:12px; color:var(--text-dim); margin:0 0 18px; line-height:1.7;">
+        You navigated away from the exam window.<br>
+        Please acknowledge this warning.<br>
+        <span style="color:var(--amber); font-weight:700;">A 30-second penalty countdown will begin after you click OK.</span>
+      </p>
+
+      <!-- 10-second ack countdown -->
+      <div style="font-family:var(--mono); font-size:11px; color:var(--text-dim); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px;">Auto-acknowledging in</div>
+      <div id="tabSwitchAckCountdown" style="font-family:var(--mono); font-size:36px; font-weight:900; color:var(--amber); margin-bottom:18px; line-height:1;">10</div>
+
+      <button class="primary" id="tabSwitchAckBtn" style="width:100%; margin-top:0; font-size:14px; padding:12px;">
+        I Understand — Continue Exam
+      </button>
+
+      <!-- 30-second penalty bar (shown after ack) -->
+      <div id="tabSwitchPenaltyBar" style="margin-top:18px; background:var(--panel-alt); border:1px solid #5c2424; border-radius:8px; padding:14px; display:none;">
+        <div style="font-family:var(--mono); font-size:10.5px; color:var(--red); text-transform:uppercase; letter-spacing:.06em; margin-bottom:4px;">⏱ Auto-submitting answer in</div>
+        <div id="tabSwitchPenaltyCount" style="font-family:var(--mono); font-size:38px; font-weight:900; color:var(--red); line-height:1; margin-bottom:8px;">30</div>
+        <div class="meter-track" style="height:6px; background:var(--border); border-radius:3px; overflow:hidden;">
+          <div id="tabSwitchPenaltyFill" style="height:100%; background:var(--red); border-radius:3px; width:100%; transition:width 1s linear;"></div>
+        </div>
+        <div style="font-family:var(--mono); font-size:10.5px; color:var(--text-faint); margin-top:6px;">Submit your answer now to stop the countdown.</div>
+      </div>
+    </div>
+  </div>
+
   <script src="script.js"></script>
 </body>
 
