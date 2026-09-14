@@ -431,9 +431,9 @@
     </div>
   </div>
 
-  <!-- Setup Exam Schedule Settings modal overlay (Password Authenticated) -->
+  <!-- Setup Exam Schedule Settings modal overlay (Password & Account Authenticated) -->
   <div class="modal-overlay" id="examScheduleModalOverlay">
-    <div class="modal" style="max-width:520px; text-align:left; padding:24px;">
+    <div class="modal" style="max-width:540px; text-align:left; padding:24px;">
       <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:12px;">
         <h2 style="margin:0; font-size:16px; color:var(--cyan); display:flex; align-items:center; gap:6px;">
           ⚙ Setup Examination Schedule
@@ -442,45 +442,81 @@
           Close</button>
       </div>
 
-      <!-- STEP 1: Teacher Password Auth / Creation -->
+      <!-- Active Teacher Profile Banner (Shown when logged in) -->
+      <div id="activeTeacherBanner" style="display:none; align-items:center; justify-content:space-between; background:var(--panel-alt); border:1px solid var(--cyan); border-radius:6px; padding:8px 12px; margin-bottom:14px;">
+        <div style="font-family:var(--mono); font-size:12px; color:var(--text);">
+          <span>👤 Teacher: </span><strong id="activeTeacherName" style="color:var(--cyan);">Prof. User</strong>
+          <span id="activeTeacherUsername" style="color:var(--text-dim); font-size:11px; margin-left:4px;">(@username)</span>
+        </div>
+        <button class="btn-ghost" id="teacherLogoutBtn" type="button" style="padding:2px 8px; font-size:10.5px; color:var(--amber); border-color:var(--amber);">🔒 Switch / Logout</button>
+      </div>
+
+      <!-- STEP 1: Teacher Auth (Login to existing OR Create new teacher account) -->
       <div id="scheduleAuthStep">
         <p style="font-family:var(--mono); font-size:11.5px; color:var(--text-dim); margin:0 0 14px; line-height:1.5;" id="scheduleAuthDesc">
-          Please enter your Teacher Password to manage examination schedule settings.
+          Log in with your Teacher Account or create a new account to assign and manage your examination schedule.
         </p>
 
-        <!-- Container for New Password (first time setup) -->
-        <div id="scheduleNewPassWrap" style="display:none; flex-direction:column; gap:10px; margin-bottom:14px;">
+        <!-- Auth Tabs -->
+        <div style="display:flex; gap:6px; margin-bottom:14px; border-bottom:1px solid var(--border); padding-bottom:8px;">
+          <button type="button" id="tabTeacherLogin" class="teacher-tab-btn active" style="flex:1; padding:7px; font-family:var(--mono); font-size:11.5px; background:var(--panel-alt); color:var(--cyan); border:1px solid var(--cyan); border-radius:5px; cursor:pointer;">
+            🔑 Login to Account
+          </button>
+          <button type="button" id="tabTeacherRegister" class="teacher-tab-btn" style="flex:1; padding:7px; font-family:var(--mono); font-size:11.5px; background:transparent; color:var(--text-dim); border:1px solid var(--border); border-radius:5px; cursor:pointer;">
+            ➕ Create New Account
+          </button>
+        </div>
+
+        <!-- Form 1: Login to Existing Account -->
+        <div id="teacherLoginForm" style="display:flex; flex-direction:column; gap:10px; margin-bottom:14px;">
           <div>
-            <label style="display:block; font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase;">Create Teacher Password</label>
-            <input type="password" id="scheduleNewPasswordInput" placeholder="Enter new password"
+            <label style="display:block; font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase;">Username</label>
+            <input type="text" id="teacherLoginUsername" placeholder="Enter teacher username" autocomplete="off"
               style="width:100%; font-family:var(--mono); font-size:13px; color:var(--text); background:var(--panel-alt); border:1px solid var(--border); border-radius:6px; padding:9px 11px; outline:none; box-sizing:border-box;">
           </div>
           <div>
-            <label style="display:block; font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase;">Confirm Password</label>
-            <input type="password" id="scheduleConfirmPasswordInput" placeholder="Confirm password"
+            <label style="display:block; font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase;">Password</label>
+            <input type="password" id="teacherLoginPassword" placeholder="Enter password"
               style="width:100%; font-family:var(--mono); font-size:13px; color:var(--text); background:var(--panel-alt); border:1px solid var(--border); border-radius:6px; padding:9px 11px; outline:none; box-sizing:border-box;">
           </div>
         </div>
 
-        <!-- Container for Existing Password Login -->
-        <div id="scheduleLoginPassWrap" style="margin-bottom:14px;">
-          <label style="display:block; font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase;">Teacher Password</label>
-          <input type="password" id="schedulePasswordInput" placeholder="Enter teacher password"
-            style="width:100%; font-family:var(--mono); font-size:13px; color:var(--text); background:var(--panel-alt); border:1px solid var(--border); border-radius:6px; padding:9px 11px; outline:none; box-sizing:border-box;">
+        <!-- Form 2: Create New Account -->
+        <div id="teacherRegisterForm" style="display:none; flex-direction:column; gap:10px; margin-bottom:14px;">
+          <div>
+            <label style="display:block; font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase;">Teacher Full Name</label>
+            <input type="text" id="teacherRegName" placeholder="e.g. Prof. Maria Santos" autocomplete="off"
+              style="width:100%; font-family:var(--mono); font-size:13px; color:var(--text); background:var(--panel-alt); border:1px solid var(--border); border-radius:6px; padding:9px 11px; outline:none; box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="display:block; font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase;">Username</label>
+            <input type="text" id="teacherRegUsername" placeholder="e.g. msantos" autocomplete="off"
+              style="width:100%; font-family:var(--mono); font-size:13px; color:var(--text); background:var(--panel-alt); border:1px solid var(--border); border-radius:6px; padding:9px 11px; outline:none; box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="display:block; font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase;">Create Password</label>
+            <input type="password" id="teacherRegPassword" placeholder="Enter new password"
+              style="width:100%; font-family:var(--mono); font-size:13px; color:var(--text); background:var(--panel-alt); border:1px solid var(--border); border-radius:6px; padding:9px 11px; outline:none; box-sizing:border-box;">
+          </div>
+          <div>
+            <label style="display:block; font-family:var(--mono); font-size:11px; color:var(--text-dim); margin-bottom:4px; text-transform:uppercase;">Confirm Password</label>
+            <input type="password" id="teacherRegConfirmPassword" placeholder="Confirm password"
+              style="width:100%; font-family:var(--mono); font-size:13px; color:var(--text); background:var(--panel-alt); border:1px solid var(--border); border-radius:6px; padding:9px 11px; outline:none; box-sizing:border-box;">
+          </div>
         </div>
 
         <div id="scheduleAuthError" style="display:none; color:var(--red); font-family:var(--mono); font-size:11.5px; margin-bottom:12px;"></div>
 
         <div style="display:flex; justify-content:flex-end; gap:10px;">
           <button class="secondary" id="scheduleAuthCancelBtn" type="button">Cancel</button>
-          <button class="primary" id="scheduleAuthSubmitBtn" type="button" style="margin-top:0;">Unlock Setup →</button>
+          <button class="primary" id="scheduleAuthSubmitBtn" type="button" style="margin-top:0;">Login &amp; Unlock Setup →</button>
         </div>
       </div>
 
-      <!-- STEP 2: Examination & Schedule Configuration (Shown after password verified) -->
+      <!-- STEP 2: Examination & Schedule Configuration (Shown after logged in) -->
       <div id="scheduleConfigStep" style="display:none;">
         <p style="font-family:var(--mono); font-size:11.5px; color:var(--text-dim); margin:0 0 14px;">
-          Configure the subject name, active timeframe, and generated access code for this exam.
+          Configure your subject exam details, active timeframe, and generated access code below.
         </p>
 
         <!-- Subject Name Input -->
@@ -493,7 +529,7 @@
         <!-- Generated Exam Access Code Box -->
         <div style="background:#0b1d2e; border:1px solid var(--cyan); border-radius:8px; padding:12px 14px; margin-bottom:16px;">
           <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
-            <span style="font-family:var(--mono); font-size:11px; color:var(--cyan); text-transform:uppercase; font-weight:700; letter-spacing:.05em;">🔑 Generated Exam Access Code</span>
+            <span style="font-family:var(--mono); font-size:11px; color:var(--cyan); text-transform:uppercase; font-weight:700; letter-spacing:.05em;">🔑 Your Exam Access Code</span>
             <div style="display:flex; gap:6px;">
               <button class="btn-ghost" id="scheduleRegenCodeBtn" type="button" style="padding:2px 7px; font-size:10.5px;">🔄 New Code</button>
               <button class="btn-ghost" id="scheduleCopyCodeBtn" type="button" style="padding:2px 7px; font-size:10.5px; color:var(--green); border-color:var(--green);">📋 Copy</button>
@@ -502,7 +538,7 @@
           <div id="scheduleExamCodeDisplay" style="font-family:var(--mono); font-size:22px; font-weight:800; color:var(--cyan); letter-spacing:3px;">
             DB-8924
           </div>
-          <small style="display:block; font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-top:4px;">Students must enter this exact code on the Landing Page to start the exam.</small>
+          <small style="display:block; font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-top:4px;">Give this code to your students to access your specific exam.</small>
         </div>
 
         <!-- Restriction Enable Checkbox & Timeframe Fields -->
@@ -529,7 +565,7 @@
         <div id="scheduleModalStatus" style="font-family:var(--mono); font-size:11.5px; margin-bottom:14px; display:none;"></div>
 
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-          <button class="btn-ghost" id="scheduleClearBtn" type="button" style="color:var(--red); border-color:#5c2424;">Clear Schedule</button>
+          <button class="btn-ghost" id="scheduleClearBtn" type="button" style="color:var(--red); border-color:#5c2424;">Clear My Schedule</button>
           <div style="display:flex; gap:10px;">
             <button class="secondary" id="scheduleCancelBtn" type="button">Cancel</button>
             <button class="primary" id="scheduleSaveBtn" type="button" style="margin-top:0;">Save Schedule</button>

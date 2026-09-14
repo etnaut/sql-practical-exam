@@ -263,22 +263,24 @@ let tabSwitchPenaltyRemaining = 30;
 let tabSwitchPenaltyActive = false;
 
 /* ============================= EXAM MODE SCHEDULE & AUTHORIZATION ============================= */
+const SCHEDULES_KEY = 'sqlPracticalExam_teacher_schedules_v3';
+const TEACHERS_KEY = 'sqlPracticalExam_teacher_accounts_v3';
+const CURRENT_TEACHER_KEY = 'sqlPracticalExam_current_teacher_v1';
 const SCHEDULE_KEY = 'sqlPracticalExam_schedule_v1';
 const PASSWORD_KEY = 'sqlPracticalExam_teacher_password_v1';
 const DEFAULT_TEACHER_PASSWORD = "iamatomic";
 
-let teacherPassword = '';
+let teacherAccounts = [];
+let teacherSchedules = {};
+let currentTeacher = null; // { id, username, name }
+
 let currentStudentExamCode = '';
 let currentStudentSubject = '';
+let currentStudentTeacherName = '';
 let selectedExamFilter = 'all';
 
-let examSchedule = {
-  enabled: false,
-  startISO: '',
-  endISO: '',
-  subjectName: 'Fundamentals of Database',
-  examCode: ''
-};
+let teachersDbRef = null;
+let schedulesDbRef = null;
 
 function generateExamCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -289,75 +291,186 @@ function generateExamCode() {
   return code;
 }
 
-function loadExamSchedule() {
+function loadTeacherData() {
   initFirebase();
-  // Load Teacher Password
-  try {
-    teacherPassword = localStorage.getItem(PASSWORD_KEY) || '';
-  } catch (e) { teacherPassword = ''; }
 
-  if (isFirebaseConfigured && scheduleDbRef) {
-    scheduleDbRef.on('value', (snapshot) => {
+  // Load teacher accounts from LocalStorage fallback
+  try {
+    const rawTeachers = localStorage.getItem(TEACHERS_KEY);
+    if (rawTeachers) teacherAccounts = JSON.parse(rawTeachers);
+  } catch (e) { teacherAccounts = []; }
+
+  // Load teacher schedules from LocalStorage fallback
+  try {
+    const rawSchedules = localStorage.getItem(SCHEDULES_KEY);
+    if (rawSchedules) teacherSchedules = JSON.parse(rawSchedules);
+  } catch (e) { teacherSchedules = {}; }
+
+  // Fallback / legacy default teacher account creation if empty
+  if (!teacherAccounts || teacherAccounts.length === 0) {
+    let legacyPass = '';
+    try { legacyPass = localStorage.getItem(PASSWORD_KEY) || ''; } catch (e) {}
+    const defaultPass = legacyPass || DEFAULT_TEACHER_PASSWORD;
+    teacherAccounts = [{
+      id: 'teacher_default',
+      username: 'teacher',
+      name: 'Default Teacher',
+      password: defaultPass,
+      createdAt: new Date().toISOString()
+    }];
+    saveTeacherAccounts();
+  }
+
+  // Load active teacher session
+  try {
+    const rawCurr = localStorage.getItem(CURRENT_TEACHER_KEY);
+    if (rawCurr) {
+      const parsedCurr = JSON.parse(rawCurr);
+      const match = teacherAccounts.find(t => t.username.toLowerCase() === (parsedCurr.username || '').toLowerCase());
+      if (match) {
+        currentTeacher = { id: match.id, username: match.username, name: match.name };
+      }
+    }
+  } catch (e) { currentTeacher = null; }
+
+  // Firebase Realtime listeners
+  if (isFirebaseConfigured && teachersDbRef) {
+    teachersDbRef.on('value', (snapshot) => {
       const data = snapshot.val();
       if (data) {
-        examSchedule = data;
-        if (!examSchedule.examCode) {
-          examSchedule.examCode = generateExamCode();
-          saveExamSchedule();
-        }
-      } else {
-        examSchedule = { enabled: false, startISO: '', endISO: '', subjectName: 'Fundamentals of Database', examCode: generateExamCode() };
-        saveExamSchedule();
+        teacherAccounts = Object.values(data);
+        saveTeacherAccounts(false);
+      }
+    });
+  }
+
+  if (isFirebaseConfigured && schedulesDbRef) {
+    schedulesDbRef.on('value', (snapshot) => {
+      const data = snapshot.val();
+      if (data) {
+        teacherSchedules = data;
+        saveTeacherSchedules(false);
       }
       updateScheduleUI();
     });
   } else {
+    // Migration check for legacy single schedule
     try {
-      const raw = localStorage.getItem(SCHEDULE_KEY);
-      if (raw) {
-        examSchedule = JSON.parse(raw);
-        if (!examSchedule.examCode) {
-          examSchedule.examCode = generateExamCode();
-          saveExamSchedule();
-        }
-      } else {
-        examSchedule = { enabled: false, startISO: '', endISO: '', subjectName: 'Fundamentals of Database', examCode: generateExamCode() };
-        saveExamSchedule();
+      const legacyRaw = localStorage.getItem(SCHEDULE_KEY);
+      if (legacyRaw && Object.keys(teacherSchedules).length === 0) {
+        const legacySched = JSON.parse(legacyRaw);
+        teacherSchedules['teacher'] = {
+          enabled: !!legacySched.enabled,
+          startISO: legacySched.startISO || '',
+          endISO: legacySched.endISO || '',
+          subjectName: legacySched.subjectName || 'Fundamentals of Database',
+          examCode: legacySched.examCode || generateExamCode(),
+          teacherName: 'Default Teacher',
+          teacherUsername: 'teacher'
+        };
+        saveTeacherSchedules();
       }
-    } catch (e) {
-      examSchedule = { enabled: false, startISO: '', endISO: '', subjectName: 'Fundamentals of Database', examCode: generateExamCode() };
-    }
+    } catch (e) {}
     updateScheduleUI();
   }
 }
 
-function saveExamSchedule() {
-  if (isFirebaseConfigured && scheduleDbRef) {
-    scheduleDbRef.set(examSchedule);
-  }
+function saveTeacherAccounts(syncFirebase = true) {
   try {
-    localStorage.setItem(SCHEDULE_KEY, JSON.stringify(examSchedule));
-  } catch (e) { /* ignore storage error */ }
+    localStorage.setItem(TEACHERS_KEY, JSON.stringify(teacherAccounts));
+  } catch (e) {}
+  if (syncFirebase && isFirebaseConfigured && teachersDbRef) {
+    const map = {};
+    teacherAccounts.forEach(t => map[t.username.toLowerCase()] = t);
+    teachersDbRef.set(map);
+  }
+}
+
+function saveTeacherSchedules(syncFirebase = true) {
+  try {
+    localStorage.setItem(SCHEDULES_KEY, JSON.stringify(teacherSchedules));
+  } catch (e) {}
+  if (syncFirebase && isFirebaseConfigured && schedulesDbRef) {
+    schedulesDbRef.set(teacherSchedules);
+  }
   updateScheduleUI();
 }
 
-function checkExamAvailability() {
-  if (!examSchedule || !examSchedule.enabled) {
-    return { available: false, status: 'no_schedule', message: '🔒 Exam Mode is currently closed. A teacher must set an Exam Schedule to open it.' };
+function getActiveTeacherSchedule(username) {
+  if (!username) return null;
+  const key = username.toLowerCase();
+  if (!teacherSchedules[key]) {
+    teacherSchedules[key] = {
+      enabled: false,
+      startISO: '',
+      endISO: '',
+      subjectName: 'Fundamentals of Database',
+      examCode: generateExamCode(),
+      teacherName: currentTeacher ? currentTeacher.name : 'Teacher',
+      teacherUsername: username
+    };
   }
+  return teacherSchedules[key];
+}
+
+function checkExamAvailability() {
+  const activeSchedules = Object.values(teacherSchedules).filter(s => s && s.enabled);
+  if (activeSchedules.length === 0) {
+    return { available: false, status: 'no_schedule', message: '🔒 Exam Mode is currently closed. Ask your teacher for an active Exam Access Code.' };
+  }
+
   const now = Date.now();
-  const startTime = examSchedule.startISO ? new Date(examSchedule.startISO).getTime() : 0;
-  const endTime = examSchedule.endISO ? new Date(examSchedule.endISO).getTime() : Infinity;
+  let openCount = 0;
+  let closedReason = '🔒 Exam Mode is currently closed.';
+
+  for (const sched of activeSchedules) {
+    const startTime = sched.startISO ? new Date(sched.startISO).getTime() : 0;
+    const endTime = sched.endISO ? new Date(sched.endISO).getTime() : Infinity;
+
+    if ((!startTime || now >= startTime) && (!endTime || now <= endTime)) {
+      openCount++;
+    } else if (startTime && now < startTime) {
+      const startStr = new Date(sched.startISO).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+      closedReason = `🔒 Scheduled exam opens on ${startStr}`;
+    } else if (endTime && now > endTime) {
+      closedReason = `🔒 Exam ended on ${new Date(sched.endISO).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}`;
+    }
+  }
+
+  if (openCount > 0) {
+    return { available: true, status: 'open', message: `🟢 ${openCount} Exam Schedule(s) Active` };
+  }
+  return { available: false, status: 'closed', message: closedReason };
+}
+
+function validateStudentExamCode(enteredCode) {
+  if (!enteredCode) return { valid: false, message: 'Please enter a 6-character Exam Access Code.' };
+  const cleanCode = enteredCode.trim().toUpperCase();
+
+  const matchingSchedule = Object.values(teacherSchedules).find(s => s && s.examCode && s.examCode.toUpperCase() === cleanCode);
+
+  if (!matchingSchedule) {
+    return { valid: false, message: 'Invalid Exam Access Code. Please ask your teacher for the correct code.' };
+  }
+
+  if (!matchingSchedule.enabled) {
+    return { valid: false, message: 'This exam schedule is currently disabled by the teacher.' };
+  }
+
+  const now = Date.now();
+  const startTime = matchingSchedule.startISO ? new Date(matchingSchedule.startISO).getTime() : 0;
+  const endTime = matchingSchedule.endISO ? new Date(matchingSchedule.endISO).getTime() : Infinity;
 
   if (startTime && now < startTime) {
-    const startStr = new Date(examSchedule.startISO).toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    return { available: false, status: 'scheduled', message: `🔒 Exam Mode is locked. Scheduled to open on ${startStr}` };
+    const startStr = new Date(matchingSchedule.startISO).toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    return { valid: false, message: `🔒 This exam is locked until ${startStr}` };
   }
   if (endTime && now > endTime) {
-    const endStr = new Date(examSchedule.endISO).toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    return { available: false, status: 'closed', message: `🔒 Exam Mode is closed. The exam ended on ${endStr}` };
+    const endStr = new Date(matchingSchedule.endISO).toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+    return { valid: false, message: `🔒 This exam closed on ${endStr}` };
   }
-  return { available: true, status: 'open', message: '🟢 Exam Mode is currently active' };
+
+  return { valid: true, schedule: matchingSchedule };
 }
 
 function updateScheduleUI() {
@@ -370,16 +483,8 @@ function updateScheduleUI() {
   const codeWrap = document.getElementById('examCodeWrap');
 
   if (noticeEl) {
-    if (!avail.available) {
-      noticeEl.textContent = avail.message;
-      noticeEl.style.display = 'block';
-    } else if (examSchedule && examSchedule.enabled) {
-      const subjectTag = examSchedule.subjectName ? ` (${examSchedule.subjectName})` : '';
-      noticeEl.textContent = `🟢 Exam Schedule Active${subjectTag}`;
-      noticeEl.style.display = 'block';
-    } else {
-      noticeEl.style.display = 'none';
-    }
+    noticeEl.textContent = avail.message;
+    noticeEl.style.display = (avail.available || Object.keys(teacherSchedules).length > 0) ? 'block' : 'none';
   }
 
   if (cardExam) {
@@ -400,76 +505,155 @@ function updateScheduleUI() {
   }
 }
 
-function promptExamScheduleSettings() {
-  const modal = document.getElementById('examScheduleModalOverlay');
-  const authStep = document.getElementById('scheduleAuthStep');
-  const configStep = document.getElementById('scheduleConfigStep');
-  const authDesc = document.getElementById('scheduleAuthDesc');
-  const newPassWrap = document.getElementById('scheduleNewPassWrap');
-  const loginPassWrap = document.getElementById('scheduleLoginPassWrap');
+// Modal tab switcher & auth handlers
+function setTeacherAuthTab(tab) {
+  const loginBtn = document.getElementById('tabTeacherLogin');
+  const regBtn = document.getElementById('tabTeacherRegister');
+  const loginForm = document.getElementById('teacherLoginForm');
+  const regForm = document.getElementById('teacherRegisterForm');
   const authErr = document.getElementById('scheduleAuthError');
+  const submitBtn = document.getElementById('scheduleAuthSubmitBtn');
 
-  if (!modal) return;
   if (authErr) authErr.style.display = 'none';
 
-  // Check if teacher password has been configured yet
-  const hasPass = teacherPassword && teacherPassword.trim() !== '';
-
-  if (!hasPass) {
-    if (authDesc) authDesc.textContent = '🔒 First time setup: Please create a Teacher Password to protect the exam schedule settings.';
-    if (newPassWrap) newPassWrap.style.display = 'flex';
-    if (loginPassWrap) loginPassWrap.style.display = 'none';
+  if (tab === 'login') {
+    if (loginBtn) loginBtn.className = 'teacher-tab-btn active';
+    if (regBtn) regBtn.className = 'teacher-tab-btn';
+    if (loginForm) loginForm.style.display = 'flex';
+    if (regForm) regForm.style.display = 'none';
+    if (submitBtn) submitBtn.textContent = 'Login & Unlock Setup →';
   } else {
-    if (authDesc) authDesc.textContent = '🔑 Please enter your Teacher Password to manage examination schedule settings.';
-    if (newPassWrap) newPassWrap.style.display = 'none';
-    if (loginPassWrap) loginPassWrap.style.display = 'block';
+    if (loginBtn) loginBtn.className = 'teacher-tab-btn';
+    if (regBtn) regBtn.className = 'teacher-tab-btn active';
+    if (loginForm) loginForm.style.display = 'none';
+    if (regForm) regForm.style.display = 'flex';
+    if (submitBtn) submitBtn.textContent = 'Create Account & Unlock Setup →';
   }
+}
 
-  // Clear inputs
-  document.getElementById('scheduleNewPasswordInput').value = '';
-  document.getElementById('scheduleConfirmPasswordInput').value = '';
-  document.getElementById('schedulePasswordInput').value = '';
+function promptExamScheduleSettings() {
+  const modal = document.getElementById('examScheduleModalOverlay');
+  if (!modal) return;
 
-  if (authStep) authStep.style.display = 'block';
-  if (configStep) configStep.style.display = 'none';
+  const banner = document.getElementById('activeTeacherBanner');
+  const nameEl = document.getElementById('activeTeacherName');
+  const userEl = document.getElementById('activeTeacherUsername');
+  const authStep = document.getElementById('scheduleAuthStep');
+  const configStep = document.getElementById('scheduleConfigStep');
+  const authErr = document.getElementById('scheduleAuthError');
+
+  if (authErr) authErr.style.display = 'none';
+
+  if (currentTeacher) {
+    if (banner) {
+      banner.style.display = 'flex';
+      if (nameEl) nameEl.textContent = currentTeacher.name;
+      if (userEl) userEl.textContent = `(@${currentTeacher.username})`;
+    }
+    if (authStep) authStep.style.display = 'none';
+    openScheduleConfigStep();
+  } else {
+    if (banner) banner.style.display = 'none';
+    if (authStep) authStep.style.display = 'block';
+    if (configStep) configStep.style.display = 'none';
+    setTeacherAuthTab('login');
+  }
 
   modal.classList.add('show');
 }
 
-function submitTeacherPasswordAuth() {
-  const hasPass = teacherPassword && teacherPassword.trim() !== '';
+function submitTeacherAuth() {
+  const loginForm = document.getElementById('teacherLoginForm');
+  const isLogin = loginForm && loginForm.style.display !== 'none';
   const authErr = document.getElementById('scheduleAuthError');
   if (authErr) authErr.style.display = 'none';
 
-  if (!hasPass) {
-    // Creating password for first time
-    const newP = document.getElementById('scheduleNewPasswordInput').value.trim();
-    const confP = document.getElementById('scheduleConfirmPasswordInput').value.trim();
+  if (isLogin) {
+    const userInp = document.getElementById('teacherLoginUsername').value.trim();
+    const passInp = document.getElementById('teacherLoginPassword').value.trim();
 
-    if (!newP) {
-      if (authErr) { authErr.textContent = 'Please enter a new password.'; authErr.style.display = 'block'; }
+    if (!userInp || !passInp) {
+      if (authErr) { authErr.textContent = 'Please enter both username and password.'; authErr.style.display = 'block'; }
       return;
     }
-    if (newP !== confP) {
+
+    const match = teacherAccounts.find(t => t.username.toLowerCase() === userInp.toLowerCase());
+    if (!match) {
+      if (authErr) { authErr.textContent = 'Teacher username not found. Click "Create New Account" to register.'; authErr.style.display = 'block'; }
+      return;
+    }
+
+    if (match.password !== passInp && passInp !== DEFAULT_TEACHER_PASSWORD) {
+      if (authErr) { authErr.textContent = 'Incorrect password! Please try again.'; authErr.style.display = 'block'; }
+      return;
+    }
+
+    currentTeacher = { id: match.id, username: match.username, name: match.name };
+    try { localStorage.setItem(CURRENT_TEACHER_KEY, JSON.stringify(currentTeacher)); } catch (e) {}
+    promptExamScheduleSettings();
+  } else {
+    // Registration
+    const name = document.getElementById('teacherRegName').value.trim();
+    const username = document.getElementById('teacherRegUsername').value.trim().toLowerCase().replace(/[^a-z0-9_]/g, '');
+    const pass = document.getElementById('teacherRegPassword').value.trim();
+    const confPass = document.getElementById('teacherRegConfirmPassword').value.trim();
+
+    if (!name || !username || !pass) {
+      if (authErr) { authErr.textContent = 'Please fill out all fields.'; authErr.style.display = 'block'; }
+      return;
+    }
+
+    if (username.length < 3) {
+      if (authErr) { authErr.textContent = 'Username must be at least 3 characters long.'; authErr.style.display = 'block'; }
+      return;
+    }
+
+    if (pass !== confPass) {
       if (authErr) { authErr.textContent = 'Passwords do not match! Please verify.'; authErr.style.display = 'block'; }
       return;
     }
 
-    teacherPassword = newP;
-    try { localStorage.setItem(PASSWORD_KEY, teacherPassword); } catch (e) {}
-    openScheduleConfigStep();
-  } else {
-    // Verifying password
-    const enteredP = document.getElementById('schedulePasswordInput').value.trim();
-    if (enteredP === teacherPassword || enteredP === DEFAULT_TEACHER_PASSWORD) {
-      openScheduleConfigStep();
-    } else {
-      if (authErr) { authErr.textContent = 'Incorrect password! Please try again.'; authErr.style.display = 'block'; }
+    if (teacherAccounts.some(t => t.username.toLowerCase() === username)) {
+      if (authErr) { authErr.textContent = `Username "@${username}" is already registered. Please choose another username or log in.`; authErr.style.display = 'block'; }
+      return;
     }
+
+    const newTeacher = {
+      id: 'teacher_' + Date.now(),
+      username,
+      name,
+      password: pass,
+      createdAt: new Date().toISOString()
+    };
+
+    teacherAccounts.push(newTeacher);
+    saveTeacherAccounts();
+
+    currentTeacher = { id: newTeacher.id, username: newTeacher.username, name: newTeacher.name };
+    try { localStorage.setItem(CURRENT_TEACHER_KEY, JSON.stringify(currentTeacher)); } catch (e) {}
+
+    // Init schedule for new teacher
+    getActiveTeacherSchedule(username);
+
+    alert(`Account created successfully! Welcome, ${name}.`);
+    promptExamScheduleSettings();
   }
 }
 
+function logoutTeacherAccount() {
+  currentTeacher = null;
+  try { localStorage.removeItem(CURRENT_TEACHER_KEY); } catch (e) {}
+  document.getElementById('teacherLoginUsername').value = '';
+  document.getElementById('teacherLoginPassword').value = '';
+  document.getElementById('teacherRegName').value = '';
+  document.getElementById('teacherRegUsername').value = '';
+  document.getElementById('teacherRegPassword').value = '';
+  document.getElementById('teacherRegConfirmPassword').value = '';
+  promptExamScheduleSettings();
+}
+
 function openScheduleConfigStep() {
+  if (!currentTeacher) return;
   const authStep = document.getElementById('scheduleAuthStep');
   const configStep = document.getElementById('scheduleConfigStep');
   const chk = document.getElementById('scheduleEnableCheckbox');
@@ -483,13 +667,14 @@ function openScheduleConfigStep() {
   if (authStep) authStep.style.display = 'none';
   if (configStep) configStep.style.display = 'block';
 
-  if (!examSchedule.examCode) examSchedule.examCode = generateExamCode();
+  const sched = getActiveTeacherSchedule(currentTeacher.username);
+  sched.teacherName = currentTeacher.name;
 
-  if (subjectInp) subjectInp.value = examSchedule.subjectName || 'Fundamentals of Database';
-  if (codeDisplay) codeDisplay.textContent = examSchedule.examCode;
-  if (chk) chk.checked = !!examSchedule.enabled;
-  if (startInp) startInp.value = examSchedule.startISO || '';
-  if (endInp) endInp.value = examSchedule.endISO || '';
+  if (subjectInp) subjectInp.value = sched.subjectName || 'Fundamentals of Database';
+  if (codeDisplay) codeDisplay.textContent = sched.examCode || generateExamCode();
+  if (chk) chk.checked = !!sched.enabled;
+  if (startInp) startInp.value = sched.startISO || '';
+  if (endInp) endInp.value = sched.endISO || '';
 
   const updateFieldsState = () => {
     if (fieldsWrap) {
@@ -501,13 +686,18 @@ function openScheduleConfigStep() {
   if (chk) chk.onchange = updateFieldsState;
 
   if (statusEl) {
-    const avail = checkExamAvailability();
-    if (examSchedule.enabled) {
-      statusEl.textContent = avail.available ? 'Status: 🟢 Exam is Open' : `Status: ${avail.message}`;
-      statusEl.style.color = avail.available ? 'var(--green)' : 'var(--amber)';
+    if (sched.enabled) {
+      const now = Date.now();
+      const startTime = sched.startISO ? new Date(sched.startISO).getTime() : 0;
+      const endTime = sched.endISO ? new Date(sched.endISO).getTime() : Infinity;
+      const isOpen = (!startTime || now >= startTime) && (!endTime || now <= endTime);
+      statusEl.textContent = isOpen ? `Status for ${currentTeacher.name}: 🟢 Exam is Open` : `Status for ${currentTeacher.name}: 🟡 Exam Scheduled / Time Restricted`;
+      statusEl.style.color = isOpen ? 'var(--green)' : 'var(--amber)';
       statusEl.style.display = 'block';
     } else {
-      statusEl.style.display = 'none';
+      statusEl.textContent = `Status for ${currentTeacher.name}: 🔒 Schedule Disabled`;
+      statusEl.style.color = 'var(--text-dim)';
+      statusEl.style.display = 'block';
     }
   }
 }
@@ -517,6 +707,8 @@ function closeScheduleModal() {
 }
 
 function saveScheduleFromModal() {
+  if (!currentTeacher) return;
+
   const chk = document.getElementById('scheduleEnableCheckbox');
   const startInp = document.getElementById('scheduleStartInput');
   const endInp = document.getElementById('scheduleEndInput');
@@ -534,41 +726,48 @@ function saveScheduleFromModal() {
     }
   }
 
-  examSchedule = {
+  const key = currentTeacher.username.toLowerCase();
+  teacherSchedules[key] = {
     enabled: chk.checked,
     startISO: startInp.value || '',
     endISO: endInp.value || '',
     subjectName: (subjectInp && subjectInp.value.trim()) ? subjectInp.value.trim() : 'Fundamentals of Database',
-    examCode: (codeDisplay && codeDisplay.textContent.trim()) ? codeDisplay.textContent.trim() : generateExamCode()
+    examCode: (codeDisplay && codeDisplay.textContent.trim()) ? codeDisplay.textContent.trim() : generateExamCode(),
+    teacherName: currentTeacher.name,
+    teacherUsername: currentTeacher.username,
+    updatedAt: new Date().toISOString()
   };
 
-  saveExamSchedule();
+  saveTeacherSchedules();
   closeScheduleModal();
-  alert('Exam schedule & Access Code updated successfully!');
+  alert(`Exam schedule & Access Code updated successfully for ${currentTeacher.name}!`);
 }
 
 function clearScheduleFromModal() {
-  examSchedule = {
-    enabled: false,
-    startISO: '',
-    endISO: '',
-    subjectName: examSchedule.subjectName || 'Fundamentals of Database',
-    examCode: examSchedule.examCode || generateExamCode()
-  };
-  saveExamSchedule();
+  if (!currentTeacher) return;
+  const key = currentTeacher.username.toLowerCase();
+  if (teacherSchedules[key]) {
+    teacherSchedules[key].enabled = false;
+    saveTeacherSchedules();
+  }
   closeScheduleModal();
-  alert('Exam schedule cleared.');
+  alert(`Exam schedule disabled for ${currentTeacher.name}.`);
 }
 
-// Bind auth & modal buttons
-document.getElementById('scheduleAuthSubmitBtn')?.addEventListener('click', submitTeacherPasswordAuth);
+// Bind auth & modal tab event listeners
+document.getElementById('tabTeacherLogin')?.addEventListener('click', () => setTeacherAuthTab('login'));
+document.getElementById('tabTeacherRegister')?.addEventListener('click', () => setTeacherAuthTab('register'));
+document.getElementById('teacherLogoutBtn')?.addEventListener('click', logoutTeacherAccount);
+document.getElementById('scheduleAuthSubmitBtn')?.addEventListener('click', submitTeacherAuth);
 document.getElementById('scheduleAuthCancelBtn')?.addEventListener('click', closeScheduleModal);
 document.getElementById('scheduleRegenCodeBtn')?.addEventListener('click', () => {
   const codeDisplay = document.getElementById('scheduleExamCodeDisplay');
   if (codeDisplay) {
     const newCode = generateExamCode();
     codeDisplay.textContent = newCode;
-    examSchedule.examCode = newCode;
+    if (currentTeacher && teacherSchedules[currentTeacher.username.toLowerCase()]) {
+      teacherSchedules[currentTeacher.username.toLowerCase()].examCode = newCode;
+    }
   }
 });
 document.getElementById('scheduleCopyCodeBtn')?.addEventListener('click', () => {
@@ -581,6 +780,13 @@ document.getElementById('scheduleCopyCodeBtn')?.addEventListener('click', () => 
     });
   }
 });
+document.getElementById('closeExamScheduleModalBtn')?.addEventListener('click', closeScheduleModal);
+document.getElementById('scheduleCancelBtn')?.addEventListener('click', closeScheduleModal);
+document.getElementById('scheduleSaveBtn')?.addEventListener('click', saveScheduleFromModal);
+document.getElementById('scheduleClearBtn')?.addEventListener('click', clearScheduleFromModal);
+document.getElementById('landingScheduleBtn')?.addEventListener('click', promptExamScheduleSettings);
+document.getElementById('openScheduleModalBtn')?.addEventListener('click', promptExamScheduleSettings);
+
 
 
 
@@ -602,7 +808,7 @@ initSqlJs({ locateFile: f => `https://cdnjs.cloudflare.com/ajax/libs/sql.js/1.2.
     };
     db.close();
     pool = QUESTIONS.map(q => q.id); // question bank for the whole session — shared across every student
-    loadExamSchedule();
+    loadTeacherData();
     loadLeaderboard();
     renderLeaderboard();
     updateScheduleUI();
@@ -767,28 +973,35 @@ function submitStudentName() {
     return;
   }
 
-  // Validate Exam Access Code
-  const enteredCode = codeInp ? codeInp.value.trim().toUpperCase() : '';
-  const requiredCode = (examSchedule.examCode || '').trim().toUpperCase();
+  // Validate Exam Access Code against all teacher schedules
+  const enteredCode = codeInp ? codeInp.value.trim() : '';
+  const hasAnyActiveSchedule = Object.values(teacherSchedules).some(s => s && s.enabled);
 
-  if (examSchedule.enabled) {
+  if (hasAnyActiveSchedule || enteredCode) {
     if (!enteredCode) {
-      if (codeErr) { codeErr.textContent = 'Exam Access Code is required to start this exam.'; codeErr.style.display = 'block'; }
+      if (codeErr) { codeErr.textContent = 'Exam Access Code is required. Ask your teacher for the code.'; codeErr.style.display = 'block'; }
       if (codeInp) codeInp.focus();
       return;
     }
-    if (enteredCode !== requiredCode) {
-      if (codeErr) { codeErr.textContent = `Invalid Exam Access Code. Please ask your teacher for the code.`; codeErr.style.display = 'block'; }
+    const codeResult = validateStudentExamCode(enteredCode);
+    if (!codeResult.valid) {
+      if (codeErr) { codeErr.textContent = codeResult.message; codeErr.style.display = 'block'; }
       if (codeInp) codeInp.focus();
       return;
     }
+    // Code is valid — link student to the matched teacher's schedule
+    currentStudentExamCode = (codeResult.schedule.examCode || '').toUpperCase();
+    currentStudentSubject = codeResult.schedule.subjectName || 'Fundamentals of Database';
+    currentStudentTeacherName = codeResult.schedule.teacherName || '';
+  } else {
+    currentStudentExamCode = 'DB-EXAM';
+    currentStudentSubject = 'Fundamentals of Database';
+    currentStudentTeacherName = '';
   }
 
   errEl.style.display = 'none';
   if (codeErr) codeErr.style.display = 'none';
   studentName = name;
-  currentStudentExamCode = requiredCode || 'DB-EXAM';
-  currentStudentSubject = examSchedule.subjectName || 'Fundamentals of Database';
 
   document.getElementById('studentLabel').textContent = studentName;
   showExamView();
@@ -975,6 +1188,8 @@ function initFirebase() {
       }
       dbRef = firebase.database().ref('leaderboard');
       scheduleDbRef = firebase.database().ref('examSchedule');
+      teachersDbRef = firebase.database().ref('teachers');
+      schedulesDbRef = firebase.database().ref('teacherSchedules');
       isFirebaseConfigured = true;
       console.log('Firebase Cloud Database initialized successfully.');
     } catch (e) {
@@ -1029,8 +1244,9 @@ function addToLeaderboard(name, score, maxScore, question) {
     questionText: question ? question.text : '',
     submittedQuery: text,
     history: currentKeystrokeHistory.slice(),
-    examCode: currentMode === 'exam' ? (currentStudentExamCode || examSchedule.examCode || 'PRACTICE') : 'PRACTICE',
-    subjectName: currentMode === 'exam' ? (currentStudentSubject || examSchedule.subjectName || 'Fundamentals of Database') : 'Practice Session',
+    examCode: currentMode === 'exam' ? (currentStudentExamCode || 'PRACTICE') : 'PRACTICE',
+    subjectName: currentMode === 'exam' ? (currentStudentSubject || 'Fundamentals of Database') : 'Practice Session',
+    teacherName: currentMode === 'exam' ? (currentStudentTeacherName || '') : '',
     date: new Date().toLocaleString()
   };
 
@@ -1152,7 +1368,6 @@ document.getElementById('modalLeaderboardExamFilter')?.addEventListener('change'
 });
 
 document.getElementById('landingLeaderboardBtn')?.addEventListener('click', openLeaderboardModal);
-document.getElementById('landingScheduleBtn')?.addEventListener('click', promptExamScheduleSettings);
 
 document.getElementById('leaderboardSearchInput')?.addEventListener('input', (e) => {
   leaderboardSearchQuery = e.target.value;
@@ -1478,11 +1693,7 @@ document.getElementById('replayScrubber')?.addEventListener('input', (e) => {
 
 document.getElementById('closeReplayModalBtn')?.addEventListener('click', closeReplayModal);
 
-document.getElementById('openScheduleModalBtn')?.addEventListener('click', promptExamScheduleSettings);
-document.getElementById('closeExamScheduleModalBtn')?.addEventListener('click', closeScheduleModal);
-document.getElementById('scheduleCancelBtn')?.addEventListener('click', closeScheduleModal);
-document.getElementById('scheduleSaveBtn')?.addEventListener('click', saveScheduleFromModal);
-document.getElementById('scheduleClearBtn')?.addEventListener('click', clearScheduleFromModal);
+// (Schedule modal event listeners are bound in Section: EXAM MODE SCHEDULE & AUTHORIZATION)
 
 /* ============================= REFERENCE TABLES ============================= */
 function renderReferenceTables(db) {
