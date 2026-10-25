@@ -269,6 +269,7 @@ const CURRENT_TEACHER_KEY = 'sqlPracticalExam_current_teacher_v1';
 const SCHEDULE_KEY = 'sqlPracticalExam_schedule_v1';
 const PASSWORD_KEY = 'sqlPracticalExam_teacher_password_v1';
 const DEFAULT_TEACHER_PASSWORD = "iamatomic";
+const CLOCK_SKEW_GRACE_MS = 5 * 60 * 1000; // 5-minute tolerance for PC clock differences
 
 let teacherAccounts = [];
 let teacherSchedules = {};
@@ -281,6 +282,8 @@ let selectedExamFilter = 'all';
 
 let teachersDbRef = null;
 let schedulesDbRef = null;
+let firebaseConnectionStatus = 'checking'; // 'checking' | 'connected' | 'permission_denied' | 'offline'
+let firebaseLastError = '';
 
 function generateExamCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -289,6 +292,114 @@ function generateExamCode() {
     code += chars.charAt(Math.floor(Math.random() * chars.length));
   }
   return code;
+}
+
+function copyFirebaseRulesJSON() {
+  const rulesText = JSON.stringify({
+    rules: {
+      ".read": true,
+      ".write": true
+    }
+  }, null, 2);
+  navigator.clipboard.writeText(rulesText).then(() => {
+    alert('Copied Firebase Realtime Database Rules to clipboard!\n\nPaste them into Firebase Console → Realtime Database → Rules and click Publish.');
+  }).catch(() => {
+    prompt('Copy these Firebase Realtime Database Rules:', rulesText);
+  });
+}
+
+function updateFirebaseStatusUI() {
+  const badge = document.getElementById('firebaseStatusBadge');
+  const modalBanner = document.getElementById('firebaseModalBanner');
+
+  if (badge) {
+    if (firebaseConnectionStatus === 'connected') {
+      badge.textContent = '🟢 Firebase: Connected';
+      badge.style.color = 'var(--green)';
+      badge.style.borderColor = 'var(--green)';
+    } else if (firebaseConnectionStatus === 'permission_denied') {
+      badge.textContent = '⚠️ Firebase: Rules Locked (Click to Fix)';
+      badge.style.color = 'var(--amber)';
+      badge.style.borderColor = 'var(--amber)';
+    } else if (firebaseConnectionStatus === 'offline') {
+      badge.textContent = '🟡 Firebase: Offline (Local Mode)';
+      badge.style.color = 'var(--text-dim)';
+      badge.style.borderColor = 'var(--border)';
+    } else {
+      badge.textContent = '🔄 Firebase: Connecting…';
+      badge.style.color = 'var(--text-dim)';
+      badge.style.borderColor = 'var(--border)';
+    }
+  }
+
+  if (modalBanner) {
+    if (firebaseConnectionStatus === 'connected') {
+      modalBanner.style.display = 'block';
+      modalBanner.style.background = 'rgba(34, 197, 94, 0.08)';
+      modalBanner.style.border = '1px solid var(--green)';
+      modalBanner.style.color = 'var(--green)';
+      modalBanner.innerHTML = '🟢 <strong>Firebase Cloud Connected</strong> — Exam schedules, access codes, and leaderboard scores sync live across all devices.';
+    } else if (firebaseConnectionStatus === 'permission_denied') {
+      modalBanner.style.display = 'block';
+      modalBanner.style.background = 'rgba(245, 158, 11, 0.1)';
+      modalBanner.style.border = '1px solid var(--amber)';
+      modalBanner.style.color = 'var(--text)';
+      modalBanner.innerHTML = `
+        <div style="color:var(--amber); font-weight:700; margin-bottom:4px;">⚠️ Firebase Realtime Database: Permission Denied (Test Mode Rules Expired)</div>
+        <div style="color:var(--text-dim); font-size:10.5px; margin-bottom:8px;">
+          Students can still join Exam Mode using your <b>Exam Access Code</b> or <b>Exam Link</b> below! To restore live cross-device database sync, update your Firebase Realtime Database Rules:
+        </div>
+        <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+          <button type="button" class="btn-ghost" onclick="copyFirebaseRulesJSON()" style="padding:3px 8px; font-size:10.5px; color:var(--cyan); border-color:var(--cyan);">📋 1. Copy Rules JSON</button>
+          <a href="https://console.firebase.google.com/project/sql-practical-exam/database/sql-practical-exam-default-rtdb/rules" target="_blank" rel="noopener" style="font-family:var(--mono); font-size:10.5px; color:var(--green); text-decoration:underline;">🔗 2. Open Firebase Rules Console &amp; Publish →</a>
+        </div>
+      `;
+    } else if (firebaseConnectionStatus === 'offline') {
+      modalBanner.style.display = 'block';
+      modalBanner.style.background = 'var(--panel-alt)';
+      modalBanner.style.border = '1px solid var(--border)';
+      modalBanner.style.color = 'var(--text-dim)';
+      modalBanner.innerHTML = '🟡 <strong>Firebase Offline / Unreachable</strong> — Operating in Local Mode. Students can still join using your Exam Access Code or Exam Link.';
+    } else {
+      modalBanner.style.display = 'none';
+    }
+  }
+}
+
+function applyUrlExamParams() {
+  try {
+    const params = new URLSearchParams(window.location.search);
+    const examCodeParam = (params.get('exam') || params.get('code') || '').trim().toUpperCase();
+    if (!examCodeParam) return;
+
+    const subjectParam = (params.get('subject') || 'Fundamentals of Database').trim();
+    const teacherParam = (params.get('teacher') || 'Teacher').trim();
+    const startParam = params.get('start') || '';
+    const endParam = params.get('end') || '';
+    const key = 'shared_' + examCodeParam.toLowerCase();
+
+    if (!teacherSchedules[key]) {
+      teacherSchedules[key] = {
+        enabled: true,
+        explicitlyClosed: false,
+        timeRestricted: !!(startParam || endParam),
+        startISO: startParam,
+        endISO: endParam,
+        startTimestamp: startParam ? Number(startParam) || new Date(startParam).getTime() : 0,
+        endTimestamp: endParam ? Number(endParam) || new Date(endParam).getTime() : 0,
+        subjectName: subjectParam,
+        examCode: examCodeParam,
+        teacherName: teacherParam,
+        teacherUsername: key
+      };
+    }
+
+    const codeInp = document.getElementById('studentExamCodeInput');
+    if (codeInp && !codeInp.value) {
+      codeInp.value = examCodeParam;
+    }
+    currentMode = 'exam';
+  } catch (e) {}
 }
 
 function loadTeacherData() {
@@ -306,6 +417,37 @@ function loadTeacherData() {
     if (rawSchedules) teacherSchedules = JSON.parse(rawSchedules);
   } catch (e) { teacherSchedules = {}; }
 
+  // Migration check for legacy single schedule
+  try {
+    const legacyRaw = localStorage.getItem(SCHEDULE_KEY);
+    if (legacyRaw && Object.keys(teacherSchedules).length === 0) {
+      const legacySched = JSON.parse(legacyRaw);
+      teacherSchedules['teacher'] = {
+        enabled: legacySched.enabled !== undefined ? !!legacySched.enabled : true,
+        explicitlyClosed: false,
+        timeRestricted: !!(legacySched.startISO || legacySched.endISO),
+        startISO: legacySched.startISO || '',
+        endISO: legacySched.endISO || '',
+        subjectName: legacySched.subjectName || 'Fundamentals of Database',
+        examCode: legacySched.examCode || generateExamCode(),
+        teacherName: 'Default Teacher',
+        teacherUsername: 'teacher'
+      };
+      saveTeacherSchedules(false);
+    }
+  } catch (e) {}
+
+  // Upgrade any previously saved schedule that had an examCode but had enabled=false only because time restriction was unchecked
+  Object.keys(teacherSchedules).forEach(k => {
+    const s = teacherSchedules[k];
+    if (s && s.examCode && !s.enabled && !s.explicitlyClosed && !s.startISO && !s.endISO) {
+      s.enabled = true;
+    }
+  });
+
+  // Apply URL query parameters if student opened a shared exam link
+  applyUrlExamParams();
+
   // Fallback / legacy default teacher account creation if empty
   if (!teacherAccounts || teacherAccounts.length === 0) {
     let legacyPass = '';
@@ -318,7 +460,7 @@ function loadTeacherData() {
       password: defaultPass,
       createdAt: new Date().toISOString()
     }];
-    saveTeacherAccounts();
+    saveTeacherAccounts(false);
   }
 
   // Load active teacher session
@@ -333,46 +475,84 @@ function loadTeacherData() {
     }
   } catch (e) { currentTeacher = null; }
 
-  // Firebase Realtime listeners
+  updateScheduleUI();
+  updateFirebaseStatusUI();
+
+  // Firebase Realtime listeners with error handling & automatic local-to-cloud sync
   if (isFirebaseConfigured && teachersDbRef) {
     teachersDbRef.on('value', (snapshot) => {
+      firebaseConnectionStatus = 'connected';
+      updateFirebaseStatusUI();
       const data = snapshot.val();
-      if (data) {
-        teacherAccounts = Object.values(data);
+      if (data && typeof data === 'object') {
+        const remoteAccounts = Object.values(data).filter(Boolean);
+        // Merge local accounts with remote accounts
+        const mergedMap = new Map();
+        teacherAccounts.forEach(t => { if (t && t.username) mergedMap.set(t.username.toLowerCase(), t); });
+        remoteAccounts.forEach(t => { if (t && t.username) mergedMap.set(t.username.toLowerCase(), t); });
+        teacherAccounts = Array.from(mergedMap.values());
         saveTeacherAccounts(false);
+        if (mergedMap.size > remoteAccounts.length) {
+          saveTeacherAccounts(true);
+        }
+      } else if (teacherAccounts.length > 0) {
+        saveTeacherAccounts(true);
       }
+    }, (err) => {
+      handleFirebaseError('teachers', err);
     });
   }
 
   if (isFirebaseConfigured && schedulesDbRef) {
     schedulesDbRef.on('value', (snapshot) => {
+      firebaseConnectionStatus = 'connected';
+      updateFirebaseStatusUI();
       const data = snapshot.val();
-      if (data) {
-        teacherSchedules = data;
+      if (data && typeof data === 'object') {
+        const merged = { ...teacherSchedules };
+        let needsCloudUpdate = false;
+        Object.keys(data).forEach(k => {
+          const remoteSched = data[k];
+          const localSched = merged[k];
+          if (!localSched || (remoteSched.updatedAt || '') >= (localSched.updatedAt || '')) {
+            merged[k] = remoteSched;
+          } else {
+            needsCloudUpdate = true;
+          }
+        });
+        Object.keys(teacherSchedules).forEach(k => {
+          if (!k.startsWith('shared_') && !data[k]) {
+            needsCloudUpdate = true;
+          }
+        });
+        teacherSchedules = merged;
         saveTeacherSchedules(false);
+        if (needsCloudUpdate) {
+          saveTeacherSchedules(true);
+        }
+      } else if (Object.keys(teacherSchedules).some(k => !k.startsWith('shared_'))) {
+        // Push existing local teacher schedule to Firebase automatically once connected
+        saveTeacherSchedules(true);
       }
       updateScheduleUI();
+    }, (err) => {
+      handleFirebaseError('teacherSchedules', err);
+      updateScheduleUI();
     });
-  } else {
-    // Migration check for legacy single schedule
-    try {
-      const legacyRaw = localStorage.getItem(SCHEDULE_KEY);
-      if (legacyRaw && Object.keys(teacherSchedules).length === 0) {
-        const legacySched = JSON.parse(legacyRaw);
-        teacherSchedules['teacher'] = {
-          enabled: !!legacySched.enabled,
-          startISO: legacySched.startISO || '',
-          endISO: legacySched.endISO || '',
-          subjectName: legacySched.subjectName || 'Fundamentals of Database',
-          examCode: legacySched.examCode || generateExamCode(),
-          teacherName: 'Default Teacher',
-          teacherUsername: 'teacher'
-        };
-        saveTeacherSchedules();
-      }
-    } catch (e) {}
-    updateScheduleUI();
   }
+}
+
+function handleFirebaseError(source, err) {
+  const code = (err && (err.code || err.message)) ? String(err.code || err.message) : 'UNKNOWN';
+  firebaseLastError = code;
+  if (code.toUpperCase().includes('PERMISSION_DENIED') || code.toLowerCase().includes('permission denied')) {
+    firebaseConnectionStatus = 'permission_denied';
+    console.warn(`Firebase [${source}] Permission Denied. Update Firebase Realtime Database Rules to allow read/write.`);
+  } else {
+    firebaseConnectionStatus = 'offline';
+    console.warn(`Firebase [${source}] connection error:`, err);
+  }
+  updateFirebaseStatusUI();
 }
 
 function saveTeacherAccounts(syncFirebase = true) {
@@ -381,8 +561,13 @@ function saveTeacherAccounts(syncFirebase = true) {
   } catch (e) {}
   if (syncFirebase && isFirebaseConfigured && teachersDbRef) {
     const map = {};
-    teacherAccounts.forEach(t => map[t.username.toLowerCase()] = t);
-    teachersDbRef.set(map);
+    teacherAccounts.forEach(t => {
+      if (t && t.username) map[t.username.toLowerCase()] = t;
+    });
+    teachersDbRef.set(map).then(() => {
+      firebaseConnectionStatus = 'connected';
+      updateFirebaseStatusUI();
+    }).catch(err => handleFirebaseError('teachers.set', err));
   }
 }
 
@@ -391,7 +576,19 @@ function saveTeacherSchedules(syncFirebase = true) {
     localStorage.setItem(SCHEDULES_KEY, JSON.stringify(teacherSchedules));
   } catch (e) {}
   if (syncFirebase && isFirebaseConfigured && schedulesDbRef) {
-    schedulesDbRef.set(teacherSchedules);
+    const cleanSchedules = {};
+    Object.keys(teacherSchedules).forEach(k => {
+      if (!k.startsWith('shared_')) cleanSchedules[k] = teacherSchedules[k];
+    });
+    schedulesDbRef.set(cleanSchedules).then(() => {
+      firebaseConnectionStatus = 'connected';
+      updateFirebaseStatusUI();
+    }).catch(err => handleFirebaseError('teacherSchedules.set', err));
+    // Also mirror active schedule to legacy /examSchedule node for backward compatibility
+    if (scheduleDbRef && currentTeacher) {
+      const curr = teacherSchedules[currentTeacher.username.toLowerCase()];
+      if (curr) scheduleDbRef.set(curr).catch(() => {});
+    }
   }
   updateScheduleUI();
 }
@@ -401,9 +598,13 @@ function getActiveTeacherSchedule(username) {
   const key = username.toLowerCase();
   if (!teacherSchedules[key]) {
     teacherSchedules[key] = {
-      enabled: false,
+      enabled: true,
+      explicitlyClosed: false,
+      timeRestricted: false,
       startISO: '',
       endISO: '',
+      startTimestamp: 0,
+      endTimestamp: 0,
       subjectName: 'Fundamentals of Database',
       examCode: generateExamCode(),
       teacherName: currentTeacher ? currentTeacher.name : 'Teacher',
@@ -413,10 +614,40 @@ function getActiveTeacherSchedule(username) {
   return teacherSchedules[key];
 }
 
+function getScheduleBounds(sched) {
+  if (!sched) return { startTime: 0, endTime: Infinity };
+  // Only enforce start/end times if timeRestricted is not explicitly false and ISO/timestamp is present
+  const hasTimeRestriction = sched.timeRestricted !== undefined
+    ? !!sched.timeRestricted
+    : !!(sched.startISO || sched.endISO);
+  if (!hasTimeRestriction) {
+    return { startTime: 0, endTime: Infinity };
+  }
+  const startTime = sched.startTimestamp || (sched.startISO ? new Date(sched.startISO).getTime() : 0) || 0;
+  const endTime = sched.endTimestamp || (sched.endISO ? new Date(sched.endISO).getTime() : Infinity) || Infinity;
+  return { startTime, endTime };
+}
+
 function checkExamAvailability() {
-  const activeSchedules = Object.values(teacherSchedules).filter(s => s && s.enabled);
+  const allSchedules = Object.values(teacherSchedules).filter(Boolean);
+  const activeSchedules = allSchedules.filter(s => s.enabled || (!s.explicitlyClosed && s.examCode && !s.startISO && !s.endISO));
+
+  // If no schedules exist locally yet (e.g. student PC when Firebase rules are locked or still loading),
+  // keep Exam Mode open so the student can enter the Teacher's Exam Access Code!
+  if (allSchedules.length === 0 || (activeSchedules.length === 0 && firebaseConnectionStatus !== 'connected')) {
+    return {
+      available: true,
+      status: 'code_ready',
+      message: '🔑 Enter your Teacher Exam Access Code to begin'
+    };
+  }
+
   if (activeSchedules.length === 0) {
-    return { available: false, status: 'no_schedule', message: '🔒 Exam Mode is currently closed. Ask your teacher for an active Exam Access Code.' };
+    return {
+      available: false,
+      status: 'no_schedule',
+      message: '🔒 Exam Mode is currently closed by the teacher.'
+    };
   }
 
   const now = Date.now();
@@ -424,16 +655,15 @@ function checkExamAvailability() {
   let closedReason = '🔒 Exam Mode is currently closed.';
 
   for (const sched of activeSchedules) {
-    const startTime = sched.startISO ? new Date(sched.startISO).getTime() : 0;
-    const endTime = sched.endISO ? new Date(sched.endISO).getTime() : Infinity;
+    const { startTime, endTime } = getScheduleBounds(sched);
 
-    if ((!startTime || now >= startTime) && (!endTime || now <= endTime)) {
+    if ((!startTime || (now + CLOCK_SKEW_GRACE_MS) >= startTime) && (!endTime || now <= endTime)) {
       openCount++;
     } else if (startTime && now < startTime) {
-      const startStr = new Date(sched.startISO).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
+      const startStr = new Date(startTime).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' });
       closedReason = `🔒 Scheduled exam opens on ${startStr}`;
     } else if (endTime && now > endTime) {
-      closedReason = `🔒 Exam ended on ${new Date(sched.endISO).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}`;
+      closedReason = `🔒 Exam ended on ${new Date(endTime).toLocaleString([], { month:'short', day:'numeric', hour:'2-digit', minute:'2-digit' })}`;
     }
   }
 
@@ -444,33 +674,49 @@ function checkExamAvailability() {
 }
 
 function validateStudentExamCode(enteredCode) {
-  if (!enteredCode) return { valid: false, message: 'Please enter a 6-character Exam Access Code.' };
+  if (!enteredCode) return { valid: false, message: 'Please enter your Exam Access Code.' };
   const cleanCode = enteredCode.trim().toUpperCase();
 
-  const matchingSchedule = Object.values(teacherSchedules).find(s => s && s.examCode && s.examCode.toUpperCase() === cleanCode);
+  const matchingSchedule = Object.values(teacherSchedules).find(
+    s => s && s.examCode && s.examCode.trim().toUpperCase() === cleanCode
+  );
 
-  if (!matchingSchedule) {
-    return { valid: false, message: 'Invalid Exam Access Code. Please ask your teacher for the correct code.' };
+  if (matchingSchedule) {
+    if (!matchingSchedule.enabled && matchingSchedule.explicitlyClosed) {
+      return { valid: false, message: 'This exam schedule has been closed by the teacher.' };
+    }
+
+    const now = Date.now();
+    const { startTime, endTime } = getScheduleBounds(matchingSchedule);
+
+    if (startTime && (now + CLOCK_SKEW_GRACE_MS) < startTime) {
+      const startStr = new Date(startTime).toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      return { valid: false, message: `🔒 This exam is locked until ${startStr}` };
+    }
+    if (endTime && now > endTime) {
+      const endStr = new Date(endTime).toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
+      return { valid: false, message: `🔒 This exam closed on ${endStr}` };
+    }
+
+    return { valid: true, schedule: matchingSchedule };
   }
 
-  if (!matchingSchedule.enabled) {
-    return { valid: false, message: 'This exam schedule is currently disabled by the teacher.' };
+  // Fallback when Firebase cannot sync schedules to the student's browser (e.g. Permission Denied / Offline):
+  // Accept valid teacher-generated Exam Access Codes (e.g. DB-XXXX) so students are never blocked from taking the exam.
+  const isStandardExamCode = /^DB-[A-Z0-9]{4}$/i.test(cleanCode) || /^[A-Z0-9]{2,4}-[A-Z0-9]{3,6}$/i.test(cleanCode);
+  if (isStandardExamCode && (firebaseConnectionStatus !== 'connected' || Object.keys(teacherSchedules).length === 0)) {
+    return {
+      valid: true,
+      schedule: {
+        enabled: true,
+        examCode: cleanCode,
+        subjectName: 'Fundamentals of Database',
+        teacherName: ''
+      }
+    };
   }
 
-  const now = Date.now();
-  const startTime = matchingSchedule.startISO ? new Date(matchingSchedule.startISO).getTime() : 0;
-  const endTime = matchingSchedule.endISO ? new Date(matchingSchedule.endISO).getTime() : Infinity;
-
-  if (startTime && now < startTime) {
-    const startStr = new Date(matchingSchedule.startISO).toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    return { valid: false, message: `🔒 This exam is locked until ${startStr}` };
-  }
-  if (endTime && now > endTime) {
-    const endStr = new Date(matchingSchedule.endISO).toLocaleString([], { month:'short', day:'numeric', year:'numeric', hour:'2-digit', minute:'2-digit' });
-    return { valid: false, message: `🔒 This exam closed on ${endStr}` };
-  }
-
-  return { valid: true, schedule: matchingSchedule };
+  return { valid: false, message: 'Invalid Exam Access Code. Please ask your teacher for the correct code.' };
 }
 
 function updateScheduleUI() {
@@ -484,7 +730,8 @@ function updateScheduleUI() {
 
   if (noticeEl) {
     noticeEl.textContent = avail.message;
-    noticeEl.style.display = (avail.available || Object.keys(teacherSchedules).length > 0) ? 'block' : 'none';
+    noticeEl.style.color = avail.available ? 'var(--green)' : 'var(--amber)';
+    noticeEl.style.display = 'block';
   }
 
   if (cardExam) {
@@ -495,13 +742,21 @@ function updateScheduleUI() {
     codeWrap.style.display = (currentMode === 'exam' && avail.available) ? 'block' : 'none';
   }
 
-  if (currentMode === 'exam' && !avail.available) {
-    if (errEl) {
-      errEl.textContent = avail.message;
-      errEl.style.display = 'block';
+  if (currentMode === 'exam') {
+    if (!avail.available) {
+      if (errEl) {
+        errEl.textContent = avail.message;
+        errEl.style.display = 'block';
+      }
+      if (startBtn) startBtn.disabled = true;
+      if (nameInput) nameInput.disabled = true;
+    } else {
+      if (errEl && errEl.textContent.includes('🔒')) {
+        errEl.style.display = 'none';
+      }
+      if (startBtn && SQL) startBtn.disabled = false;
+      if (nameInput && SQL) nameInput.disabled = false;
     }
-    if (startBtn) startBtn.disabled = true;
-    if (nameInput) nameInput.disabled = true;
   }
 }
 
@@ -667,12 +922,18 @@ function openScheduleConfigStep() {
   if (authStep) authStep.style.display = 'none';
   if (configStep) configStep.style.display = 'block';
 
+  updateFirebaseStatusUI();
+
   const sched = getActiveTeacherSchedule(currentTeacher.username);
   sched.teacherName = currentTeacher.name;
 
+  const hasTimeRestriction = sched.timeRestricted !== undefined
+    ? !!sched.timeRestricted
+    : !!(sched.startISO || sched.endISO);
+
   if (subjectInp) subjectInp.value = sched.subjectName || 'Fundamentals of Database';
   if (codeDisplay) codeDisplay.textContent = sched.examCode || generateExamCode();
-  if (chk) chk.checked = !!sched.enabled;
+  if (chk) chk.checked = hasTimeRestriction;
   if (startInp) startInp.value = sched.startISO || '';
   if (endInp) endInp.value = sched.endISO || '';
 
@@ -688,14 +949,15 @@ function openScheduleConfigStep() {
   if (statusEl) {
     if (sched.enabled) {
       const now = Date.now();
-      const startTime = sched.startISO ? new Date(sched.startISO).getTime() : 0;
-      const endTime = sched.endISO ? new Date(sched.endISO).getTime() : Infinity;
-      const isOpen = (!startTime || now >= startTime) && (!endTime || now <= endTime);
-      statusEl.textContent = isOpen ? `Status for ${currentTeacher.name}: 🟢 Exam is Open` : `Status for ${currentTeacher.name}: 🟡 Exam Scheduled / Time Restricted`;
+      const { startTime, endTime } = getScheduleBounds(sched);
+      const isOpen = (!startTime || (now + CLOCK_SKEW_GRACE_MS) >= startTime) && (!endTime || now <= endTime);
+      statusEl.textContent = isOpen
+        ? `Status for ${currentTeacher.name}: 🟢 Exam is Open (Code: ${sched.examCode})`
+        : `Status for ${currentTeacher.name}: 🟡 Exam Scheduled / Time Restricted`;
       statusEl.style.color = isOpen ? 'var(--green)' : 'var(--amber)';
       statusEl.style.display = 'block';
     } else {
-      statusEl.textContent = `Status for ${currentTeacher.name}: 🔒 Schedule Disabled`;
+      statusEl.textContent = `Status for ${currentTeacher.name}: 🔒 Exam Closed / Disabled`;
       statusEl.style.color = 'var(--text-dim)';
       statusEl.style.display = 'block';
     }
@@ -715,9 +977,11 @@ function saveScheduleFromModal() {
   const subjectInp = document.getElementById('scheduleSubjectInput');
   const codeDisplay = document.getElementById('scheduleExamCodeDisplay');
 
-  if (chk.checked) {
+  const useTimeRestriction = !!(chk && chk.checked);
+
+  if (useTimeRestriction) {
     if (!startInp.value && !endInp.value) {
-      alert('Please specify at least a Start Date/Time or End Date/Time.');
+      alert('Please specify at least a Start Date/Time or End Date/Time, or uncheck "Enable Schedule Time Restriction" to open the exam immediately.');
       return;
     }
     if (startInp.value && endInp.value && new Date(startInp.value) >= new Date(endInp.value)) {
@@ -727,10 +991,17 @@ function saveScheduleFromModal() {
   }
 
   const key = currentTeacher.username.toLowerCase();
+  const startISO = useTimeRestriction ? (startInp.value || '') : '';
+  const endISO = useTimeRestriction ? (endInp.value || '') : '';
+
   teacherSchedules[key] = {
-    enabled: chk.checked,
-    startISO: startInp.value || '',
-    endISO: endInp.value || '',
+    enabled: true,
+    explicitlyClosed: false,
+    timeRestricted: useTimeRestriction,
+    startISO,
+    endISO,
+    startTimestamp: startISO ? new Date(startISO).getTime() : 0,
+    endTimestamp: endISO ? new Date(endISO).getTime() : 0,
     subjectName: (subjectInp && subjectInp.value.trim()) ? subjectInp.value.trim() : 'Fundamentals of Database',
     examCode: (codeDisplay && codeDisplay.textContent.trim()) ? codeDisplay.textContent.trim() : generateExamCode(),
     teacherName: currentTeacher.name,
@@ -740,7 +1011,7 @@ function saveScheduleFromModal() {
 
   saveTeacherSchedules();
   closeScheduleModal();
-  alert(`Exam schedule & Access Code updated successfully for ${currentTeacher.name}!`);
+  alert(`Exam is now OPEN for ${currentTeacher.name}!\nAccess Code: ${teacherSchedules[key].examCode}`);
 }
 
 function clearScheduleFromModal() {
@@ -748,10 +1019,12 @@ function clearScheduleFromModal() {
   const key = currentTeacher.username.toLowerCase();
   if (teacherSchedules[key]) {
     teacherSchedules[key].enabled = false;
+    teacherSchedules[key].explicitlyClosed = true;
+    teacherSchedules[key].updatedAt = new Date().toISOString();
     saveTeacherSchedules();
   }
   closeScheduleModal();
-  alert(`Exam schedule disabled for ${currentTeacher.name}.`);
+  alert(`Exam schedule closed/disabled for ${currentTeacher.name}.`);
 }
 
 // Bind auth & modal tab event listeners
@@ -779,6 +1052,30 @@ document.getElementById('scheduleCopyCodeBtn')?.addEventListener('click', () => 
       alert(`Exam Code: ${codeDisplay.textContent.trim()}`);
     });
   }
+});
+document.getElementById('scheduleCopyLinkBtn')?.addEventListener('click', () => {
+  const codeDisplay = document.getElementById('scheduleExamCodeDisplay');
+  const subjectInp = document.getElementById('scheduleSubjectInput');
+  const chk = document.getElementById('scheduleEnableCheckbox');
+  const startInp = document.getElementById('scheduleStartInput');
+  const endInp = document.getElementById('scheduleEndInput');
+  const code = (codeDisplay && codeDisplay.textContent) ? codeDisplay.textContent.trim() : '';
+  const subj = (subjectInp && subjectInp.value.trim()) ? subjectInp.value.trim() : 'Fundamentals of Database';
+  const teacher = currentTeacher ? currentTeacher.name : 'Teacher';
+  const url = new URL(window.location.href.split('?')[0]);
+  url.searchParams.set('exam', code);
+  url.searchParams.set('subject', subj);
+  url.searchParams.set('teacher', teacher);
+  if (chk && chk.checked) {
+    if (startInp && startInp.value) url.searchParams.set('start', String(new Date(startInp.value).getTime()));
+    if (endInp && endInp.value) url.searchParams.set('end', String(new Date(endInp.value).getTime()));
+  }
+  const shareUrl = url.toString();
+  navigator.clipboard.writeText(shareUrl).then(() => {
+    alert(`Copied Student Exam Link!\n\n${shareUrl}\n\nSend this link (or code ${code}) to your students.`);
+  }).catch(() => {
+    prompt('Copy this Student Exam Link:', shareUrl);
+  });
 });
 document.getElementById('closeExamScheduleModalBtn')?.addEventListener('click', closeScheduleModal);
 document.getElementById('scheduleCancelBtn')?.addEventListener('click', closeScheduleModal);
@@ -926,6 +1223,9 @@ document.getElementById('backBtn').addEventListener('click', () => {
 document.getElementById('studentNameInput').addEventListener('keydown', (e) => {
   if (e.key === 'Enter') { e.preventDefault(); submitStudentName(); }
 });
+document.getElementById('studentExamCodeInput')?.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter') { e.preventDefault(); submitStudentName(); }
+});
 
 function isNameTaken(name) {
   if (!name) return false;
@@ -975,29 +1275,21 @@ function submitStudentName() {
 
   // Validate Exam Access Code against all teacher schedules
   const enteredCode = codeInp ? codeInp.value.trim() : '';
-  const hasAnyActiveSchedule = Object.values(teacherSchedules).some(s => s && s.enabled);
-
-  if (hasAnyActiveSchedule || enteredCode) {
-    if (!enteredCode) {
-      if (codeErr) { codeErr.textContent = 'Exam Access Code is required. Ask your teacher for the code.'; codeErr.style.display = 'block'; }
-      if (codeInp) codeInp.focus();
-      return;
-    }
-    const codeResult = validateStudentExamCode(enteredCode);
-    if (!codeResult.valid) {
-      if (codeErr) { codeErr.textContent = codeResult.message; codeErr.style.display = 'block'; }
-      if (codeInp) codeInp.focus();
-      return;
-    }
-    // Code is valid — link student to the matched teacher's schedule
-    currentStudentExamCode = (codeResult.schedule.examCode || '').toUpperCase();
-    currentStudentSubject = codeResult.schedule.subjectName || 'Fundamentals of Database';
-    currentStudentTeacherName = codeResult.schedule.teacherName || '';
-  } else {
-    currentStudentExamCode = 'DB-EXAM';
-    currentStudentSubject = 'Fundamentals of Database';
-    currentStudentTeacherName = '';
+  if (!enteredCode) {
+    if (codeErr) { codeErr.textContent = 'Exam Access Code is required. Ask your teacher for the code.'; codeErr.style.display = 'block'; }
+    if (codeInp) codeInp.focus();
+    return;
   }
+  const codeResult = validateStudentExamCode(enteredCode);
+  if (!codeResult.valid) {
+    if (codeErr) { codeErr.textContent = codeResult.message; codeErr.style.display = 'block'; }
+    if (codeInp) codeInp.focus();
+    return;
+  }
+  // Code is valid — link student to the matched teacher's schedule
+  currentStudentExamCode = (codeResult.schedule.examCode || enteredCode).toUpperCase();
+  currentStudentSubject = codeResult.schedule.subjectName || 'Fundamentals of Database';
+  currentStudentTeacherName = codeResult.schedule.teacherName || '';
 
   errEl.style.display = 'none';
   if (codeErr) codeErr.style.display = 'none';
@@ -1191,41 +1483,55 @@ function initFirebase() {
       teachersDbRef = firebase.database().ref('teachers');
       schedulesDbRef = firebase.database().ref('teacherSchedules');
       isFirebaseConfigured = true;
-      console.log('Firebase Cloud Database initialized successfully.');
+      console.log('Firebase SDK initialized. Verifying Realtime Database connection & rules...');
     } catch (e) {
       console.warn('Firebase init failed, falling back to LocalStorage:', e);
       isFirebaseConfigured = false;
+      firebaseConnectionStatus = 'offline';
+      updateFirebaseStatusUI();
     }
   } else {
     isFirebaseConfigured = false;
+    firebaseConnectionStatus = 'offline';
+    updateFirebaseStatusUI();
   }
 }
 
 function loadLeaderboard() {
   initFirebase();
+  // Always load local leaderboard first so scores are visible immediately or when offline
+  try {
+    const raw = localStorage.getItem(LEADERBOARD_KEY);
+    leaderboard = raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    leaderboard = [];
+  }
+  renderLeaderboard();
+
   if (isFirebaseConfigured && dbRef) {
     dbRef.on('value', (snapshot) => {
+      firebaseConnectionStatus = 'connected';
+      updateFirebaseStatusUI();
       const data = snapshot.val();
-      if (data) {
+      if (data && typeof data === 'object') {
         leaderboard = Object.values(data);
-      } else {
-        leaderboard = [];
+        saveLeaderboard(true);
+      } else if (leaderboard.length > 0) {
+        // Push local unsynced leaderboard entries to Firebase once connected
+        leaderboard.forEach(entry => {
+          dbRef.push(entry).catch(() => {});
+        });
       }
       renderLeaderboard();
+    }, (err) => {
+      handleFirebaseError('leaderboard', err);
+      renderLeaderboard();
     });
-  } else {
-    try {
-      const raw = localStorage.getItem(LEADERBOARD_KEY);
-      leaderboard = raw ? JSON.parse(raw) : [];
-    } catch (e) {
-      leaderboard = [];
-    }
-    renderLeaderboard();
   }
 }
 
-function saveLeaderboard() {
-  if (!isFirebaseConfigured) {
+function saveLeaderboard(forceLocal = false) {
+  if (!isFirebaseConfigured || forceLocal || firebaseConnectionStatus !== 'connected') {
     try { localStorage.setItem(LEADERBOARD_KEY, JSON.stringify(leaderboard)); } catch (e) { /* storage unavailable — ignore */ }
   }
 }
@@ -1250,12 +1556,18 @@ function addToLeaderboard(name, score, maxScore, question) {
     date: new Date().toLocaleString()
   };
 
+  // Always save locally first so scores are never lost if Firebase rules block writes
+  leaderboard.push(entry);
+  saveLeaderboard(true);
+  renderLeaderboard();
+
   if (isFirebaseConfigured && dbRef) {
-    dbRef.push(entry);
-  } else {
-    leaderboard.push(entry);
-    saveLeaderboard();
-    renderLeaderboard();
+    dbRef.push(entry).then(() => {
+      firebaseConnectionStatus = 'connected';
+      updateFirebaseStatusUI();
+    }).catch(err => {
+      handleFirebaseError('leaderboard.push', err);
+    });
   }
 }
 

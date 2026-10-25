@@ -28,6 +28,7 @@
         </div>
       </div>
       <div class="landing-header-actions">
+        <span id="firebaseStatusBadge" class="chip" style="font-family:var(--mono); font-size:11px; padding:5px 10px; cursor:pointer;" title="Click to check Firebase Cloud connection status" onclick="promptExamScheduleSettings()">🔄 Firebase: Checking…</span>
         <button class="btn-ghost" id="landingScheduleBtn" type="button">⚙ Setup Exam Schedule</button>
         <button class="btn-ghost" id="landingLeaderboardBtn" type="button">🏆 View Leaderboard</button>
       </div>
@@ -513,6 +514,10 @@
         </div>
       </div>
 
+      <!-- Firebase Cloud Sync Diagnostic Banner -->
+      <div id="firebaseModalBanner" style="display:none; font-family:var(--mono); font-size:11px; border-radius:6px; padding:10px 12px; margin-bottom:14px; line-height:1.5;">
+      </div>
+
       <!-- STEP 2: Examination & Schedule Configuration (Shown after logged in) -->
       <div id="scheduleConfigStep" style="display:none;">
         <p style="font-family:var(--mono); font-size:11.5px; color:var(--text-dim); margin:0 0 14px;">
@@ -528,25 +533,29 @@
 
         <!-- Generated Exam Access Code Box -->
         <div style="background:#0b1d2e; border:1px solid var(--cyan); border-radius:8px; padding:12px 14px; margin-bottom:16px;">
-          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px;">
+          <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
             <span style="font-family:var(--mono); font-size:11px; color:var(--cyan); text-transform:uppercase; font-weight:700; letter-spacing:.05em;">🔑 Your Exam Access Code</span>
-            <div style="display:flex; gap:6px;">
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
               <button class="btn-ghost" id="scheduleRegenCodeBtn" type="button" style="padding:2px 7px; font-size:10.5px;">🔄 New Code</button>
-              <button class="btn-ghost" id="scheduleCopyCodeBtn" type="button" style="padding:2px 7px; font-size:10.5px; color:var(--green); border-color:var(--green);">📋 Copy</button>
+              <button class="btn-ghost" id="scheduleCopyCodeBtn" type="button" style="padding:2px 7px; font-size:10.5px; color:var(--green); border-color:var(--green);">📋 Copy Code</button>
+              <button class="btn-ghost" id="scheduleCopyLinkBtn" type="button" style="padding:2px 7px; font-size:10.5px; color:var(--cyan); border-color:var(--cyan);">🔗 Copy Exam Link</button>
             </div>
           </div>
           <div id="scheduleExamCodeDisplay" style="font-family:var(--mono); font-size:22px; font-weight:800; color:var(--cyan); letter-spacing:3px;">
             DB-8924
           </div>
-          <small style="display:block; font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-top:4px;">Give this code to your students to access your specific exam.</small>
+          <small style="display:block; font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-top:4px;">Give this code (or Exam Link) to your students to access your specific exam.</small>
         </div>
 
         <!-- Restriction Enable Checkbox & Timeframe Fields -->
         <div style="background:var(--panel-alt); border:1px solid var(--border); border-radius:8px; padding:14px; margin-bottom:16px;">
-          <label style="display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:12.5px; font-weight:600; color:var(--text); cursor:pointer; margin-bottom:12px;">
+          <label style="display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:12.5px; font-weight:600; color:var(--text); cursor:pointer; margin-bottom:6px;">
             <input type="checkbox" id="scheduleEnableCheckbox" style="accent-color:var(--cyan); width:16px; height:16px;">
-            Enable Schedule Time Restriction
+            Enable Schedule Time Restriction (Optional)
           </label>
+          <small style="display:block; font-family:var(--mono); font-size:10.5px; color:var(--text-dim); margin-bottom:12px;">
+            Leave unchecked to open the exam immediately with no time limit, or check to restrict start/end times.
+          </small>
 
           <div id="scheduleFieldsWrap" style="display:flex; flex-direction:column; gap:10px; opacity:0.5; pointer-events:none; transition:opacity .2s;">
             <div>
@@ -565,10 +574,10 @@
         <div id="scheduleModalStatus" style="font-family:var(--mono); font-size:11.5px; margin-bottom:14px; display:none;"></div>
 
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-          <button class="btn-ghost" id="scheduleClearBtn" type="button" style="color:var(--red); border-color:#5c2424;">Clear My Schedule</button>
+          <button class="btn-ghost" id="scheduleClearBtn" type="button" style="color:var(--red); border-color:#5c2424;">🔒 Close / Disable Exam</button>
           <div style="display:flex; gap:10px;">
             <button class="secondary" id="scheduleCancelBtn" type="button">Cancel</button>
-            <button class="primary" id="scheduleSaveBtn" type="button" style="margin-top:0;">Save Schedule</button>
+            <button class="primary" id="scheduleSaveBtn" type="button" style="margin-top:0;">🟢 Save &amp; Open Exam</button>
           </div>
         </div>
       </div>
