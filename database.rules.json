@@ -1,6 +1,26 @@
 {
   "rules": {
-    ".read": true,
-    ".write": true
+    "portfolio_visitors": {
+      ".read": true,
+      ".write": true
+    },
+    "leaderboard": {
+      ".read": true,
+      ".write": true
+    },
+    "examSchedule": {
+      ".read": true,
+      ".write": true
+    },
+    "teachers": {
+      ".read": true,
+      ".write": true
+    },
+    "teacherSchedules": {
+      ".read": true,
+      ".write": true
+    },
+    ".read": "auth != null",
+    ".write": "auth != null"
   }
 }

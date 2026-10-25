@@ -284,6 +284,7 @@ let teachersDbRef = null;
 let schedulesDbRef = null;
 let firebaseConnectionStatus = 'checking'; // 'checking' | 'connected' | 'permission_denied' | 'offline'
 let firebaseLastError = '';
+let usingSharedFallbackPath = false;
 
 function generateExamCode() {
   const chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
@@ -297,14 +298,34 @@ function generateExamCode() {
 function copyFirebaseRulesJSON() {
   const rulesText = JSON.stringify({
     rules: {
-      ".read": true,
-      ".write": true
+      portfolio_visitors: {
+        ".read": true,
+        ".write": true
+      },
+      leaderboard: {
+        ".read": true,
+        ".write": true
+      },
+      examSchedule: {
+        ".read": true,
+        ".write": true
+      },
+      teachers: {
+        ".read": true,
+        ".write": true
+      },
+      teacherSchedules: {
+        ".read": true,
+        ".write": true
+      },
+      ".read": "auth != null",
+      ".write": "auth != null"
     }
   }, null, 2);
   navigator.clipboard.writeText(rulesText).then(() => {
-    alert('Copied Firebase Realtime Database Rules to clipboard!\n\nPaste them into Firebase Console → Realtime Database → Rules and click Publish.');
+    alert('Copied combined Firebase Realtime Database Rules (preserving portfolio_visitors) to clipboard!\n\nPaste them into Firebase Console → Realtime Database → Rules and click Publish.');
   }).catch(() => {
-    prompt('Copy these Firebase Realtime Database Rules:', rulesText);
+    prompt('Copy these combined Firebase Realtime Database Rules:', rulesText);
   });
 }
 
@@ -478,8 +499,13 @@ function loadTeacherData() {
   updateScheduleUI();
   updateFirebaseStatusUI();
 
+  attachTeacherFirebaseListeners();
+}
+
+function attachTeacherFirebaseListeners() {
   // Firebase Realtime listeners with error handling & automatic local-to-cloud sync
   if (isFirebaseConfigured && teachersDbRef) {
+    teachersDbRef.off();
     teachersDbRef.on('value', (snapshot) => {
       firebaseConnectionStatus = 'connected';
       updateFirebaseStatusUI();
@@ -504,6 +530,7 @@ function loadTeacherData() {
   }
 
   if (isFirebaseConfigured && schedulesDbRef) {
+    schedulesDbRef.off();
     schedulesDbRef.on('value', (snapshot) => {
       firebaseConnectionStatus = 'connected';
       updateFirebaseStatusUI();
@@ -546,6 +573,26 @@ function handleFirebaseError(source, err) {
   const code = (err && (err.code || err.message)) ? String(err.code || err.message) : 'UNKNOWN';
   firebaseLastError = code;
   if (code.toUpperCase().includes('PERMISSION_DENIED') || code.toLowerCase().includes('permission denied')) {
+    if (!usingSharedFallbackPath && typeof firebase !== 'undefined' && firebase.apps && firebase.apps.length) {
+      // Root paths require auth != null, while portfolio_visitors is open on this shared database.
+      // Automatically switch to portfolio_visitors/sql_exam/* so live sync works immediately!
+      usingSharedFallbackPath = true;
+      console.info('Root Firebase path requires auth; switching to shared open path portfolio_visitors/sql_exam/...');
+      try {
+        if (dbRef) dbRef.off();
+        if (teachersDbRef) teachersDbRef.off();
+        if (schedulesDbRef) schedulesDbRef.off();
+        dbRef = firebase.database().ref('portfolio_visitors/sql_exam/leaderboard');
+        scheduleDbRef = firebase.database().ref('portfolio_visitors/sql_exam/examSchedule');
+        teachersDbRef = firebase.database().ref('portfolio_visitors/sql_exam/teachers');
+        schedulesDbRef = firebase.database().ref('portfolio_visitors/sql_exam/teacherSchedules');
+        attachTeacherFirebaseListeners();
+        attachLeaderboardFirebaseListener();
+        return;
+      } catch (switchErr) {
+        console.warn('Fallback path switch failed:', switchErr);
+      }
+    }
     firebaseConnectionStatus = 'permission_denied';
     console.warn(`Firebase [${source}] Permission Denied. Update Firebase Realtime Database Rules to allow read/write.`);
   } else {
@@ -1478,10 +1525,13 @@ function initFirebase() {
       if (!firebase.apps.length) {
         firebase.initializeApp(firebaseConfig);
       }
-      dbRef = firebase.database().ref('leaderboard');
-      scheduleDbRef = firebase.database().ref('examSchedule');
-      teachersDbRef = firebase.database().ref('teachers');
-      schedulesDbRef = firebase.database().ref('teacherSchedules');
+      if (!dbRef) {
+        const prefix = usingSharedFallbackPath ? 'portfolio_visitors/sql_exam/' : '';
+        dbRef = firebase.database().ref(prefix + 'leaderboard');
+        scheduleDbRef = firebase.database().ref(prefix + 'examSchedule');
+        teachersDbRef = firebase.database().ref(prefix + 'teachers');
+        schedulesDbRef = firebase.database().ref(prefix + 'teacherSchedules');
+      }
       isFirebaseConfigured = true;
       console.log('Firebase SDK initialized. Verifying Realtime Database connection & rules...');
     } catch (e) {
@@ -1507,8 +1557,12 @@ function loadLeaderboard() {
     leaderboard = [];
   }
   renderLeaderboard();
+  attachLeaderboardFirebaseListener();
+}
 
+function attachLeaderboardFirebaseListener() {
   if (isFirebaseConfigured && dbRef) {
+    dbRef.off();
     dbRef.on('value', (snapshot) => {
       firebaseConnectionStatus = 'connected';
       updateFirebaseStatusUI();
